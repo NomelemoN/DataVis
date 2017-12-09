@@ -1,0 +1,8 @@
+Try to make maps look nicer
+Try to make animation look nicer
+Subgroups for federations (tested, untested)
+Subgroups for meet types
+For the two above points, put it in a dropdown menu
+Add year to maps
+Set constant color scale on maps so you can compare across years
+

@@ -37,9 +37,14 @@ ui <- dashboardPage(skin = "green",
                                 
                                 sliderInput("year", "Year", ##Create a input element
                                             min = min(meet_data$Year), max = max(meet_data$Year), step = 1,
-                                            value = max(meet_data$Year), animate = TRUE),
+                                            value = max(meet_data$Year), animate = animationOptions(interval = 3000, loop = FALSE, playButton = TRUE, pauseButton = TRUE)),
                                 
                                 br(), ## Add a break line
+                                testedFeds <- c('AAU','AsianPF','CommonwealthPF','CPU','EPF','FESUPO','FFForce','GBPF','IPF','IrishPF','NAPF','NASA','NIPF','NSF','NZPF','OceaniaPF','PA','RAW','THSPA','USAPL','WNPF'),
+                                allFeds <- c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','FFFORCE','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF'),
+                                checkboxGroupInput("feds", "Choose Federations:", allFeds,inline = TRUE),
+                                checkboxInput('bar','All/None'),
+                                br(), 
                                 
                                 fluidRow( 
                                   #row of content (full screen width is 12)
@@ -53,6 +58,16 @@ ui <- dashboardPage(skin = "green",
                                       #another box that will fill 9/12 of row
                                       
                                       htmlOutput("intensity_map") 
+                                      #We define contents ofthis htmlOutput in server function
+                                      
+                                  )
+                                ),
+                                
+                                fluidRow(
+                                  box(width = 12, title = "Number of meets per country",
+                                      #another box that will fill 9/12 of row
+                                      
+                                      htmlOutput("intensity_map2") 
                                       #We define contents ofthis htmlOutput in server function
                                       
                                   )
@@ -126,6 +141,20 @@ server <- function(input, output) {
                               width=800, height=500))
   })
   
+  ## Intensity map
+  output$intensity_map2 <- renderGvis({
+    #It says that intensity_map on the output is to be rendered as a 
+    #google viusualization
+    
+    #Create data that needs to be displayed
+    data <- filter(meet_data, Year==myYear()) 
+    
+    
+    #Following chart is passed to the renderGvis funciton which generates the appropriate html for output
+    gvisGeoChart(data, "LatLong", colorvar = "NumberParticipants", hovervar = "MeetName",
+                 options=list(colorAxis = "{colors: ['#e31b23']}",
+                width=800, height=500, magnifyingGlass = "{enable: true, zoomFactor: 7.5}"))
+  })
 }
 
 #==============Run the application (no change needed here)============================
