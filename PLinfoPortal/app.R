@@ -10,6 +10,7 @@ library(readr)
 
 ## Meet Data
 meet_data = read_csv("meets.csv")
+meet_data$LatLong = paste(meet_data$lat,meet_data$long,sep = ":")
 
 #=================UI Design========================================================
 ui <- dashboardPage(skin = "green",
@@ -118,7 +119,7 @@ server <- function(input, output) {
     
     
     #Following chart is passed to the renderGvis funciton which generates the appropriate html for output
-    gvisGeoChart(data, locationvar = "MeetCountry", colorvar="n", 
+    gvisGeoChart(data, "MeetCountry", colorvar="n", 
                  ##location is specified by value "MeetCountry" in table "data"
                  ##color for a location is chosen by the associated value of valiable "n" in table "data"
                  options=list(colorAxis = "{colors: ['#e31b23']}",
