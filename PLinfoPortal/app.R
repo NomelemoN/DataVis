@@ -77,19 +77,19 @@ ui <- dashboardPage(skin = "green",
                                 
                                 sliderInput("year", "Year", ##Create a input element
                                             min = min(meet_data$Year), max = max(meet_data$Year), step = 1,
-                                            value = max(meet_data$Year), animate = animationOptions(interval = 3000, loop = FALSE, playButton = TRUE, pauseButton = TRUE)),
+                                            value = max(meet_data$Year), animate = animationOptions(interval = 3000, loop = FALSE)),
                                 
                                 br(), ## Add a break line
                                 testedFeds <- c('AAU','AsianPF','CommonwealthPF','CPU','EPF','FESUPO','FFForce','GBPF','IPF','IrishPF','NAPF','NASA','NIPF','NSF','NZPF','OceaniaPF','PA','RAW','THSPA','USAPL','WNPF'),
                                 allFeds <- c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','FFFORCE','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF'),
                                 checkboxGroupInput("feds", "Choose Federations:", allFeds,inline = TRUE),
-                                checkboxInput('bar','All/None'),
+                                checkboxGroupInput('bar','Types', c('Tested', 'Untested'), inline = TRUE),
                                 br(), 
                                 
                                 fluidRow( 
                                   #row of content (full screen width is 12)
                                   
-                                  box(width = 12, title = "Number of meets per country",
+                                  box(width = 12, title = "Meets across the world",
                                       #another box that will fill 9/12 of row
                                       
                                       leafletOutput("intensity_map") 
@@ -134,6 +134,27 @@ server <- function(input, output) {
       2017
   })
   
+  myFeds <- reactive({
+    if(!is.null(input$feds))
+      input$feds
+    else
+      c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','FFFORCE','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF')
+  })
+  
+  type <-reactive({
+    if(!is.null(input$bar))
+      if("Tested" %in% input$bar && "Untested" %in% input$bar){
+        c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','FFFORCE','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF')
+      }
+      if("Tested" %in% input$bar){
+        c('AAU','AsianPF','CommonwealthPF','CPU','EPF','FESUPO','FFForce','GBPF','IPF','IrishPF','NAPF','NASA','NIPF','NSF','NZPF','OceaniaPF','PA','RAW','THSPA','USAPL','WNPF')
+      }
+      if("Untested" %in% input$bar){
+        setdiff(c('AAU','AsianPF','CommonwealthPF','CPU','EPF','FESUPO','FFForce','GBPF','IPF','IrishPF','NAPF','NASA','NIPF','NSF','NZPF','OceaniaPF','PA','RAW','THSPA','USAPL','WNPF'),c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','FFFORCE','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF'))
+      }
+    else
+      c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','FFFORCE','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF')
+  })
   
   
   # # Intensity map
@@ -180,7 +201,7 @@ server <- function(input, output) {
   output$intensity_map <- renderLeaflet({
     #colName = paste("Year", myYear(), sep="") for precomputed version
     
-    dataset <- filter(meet_data, Year==myYear()) %>% #Filters meets for the selected year
+    dataset <- filter(meet_data, Year==myYear(), Federation %in% myFeds() && Federation %in% type()) %>% #Filters meets for the selected year
       count(MeetCountry) #Counts the number of meet for each country
       world_spdf@data$n = 0
     if(nrow(dataset) != 0){
@@ -192,7 +213,7 @@ server <- function(input, output) {
       
     # Create a color palette with handmade bins.
     mybins=c(0,1,10,100,200,400, 800,Inf)
-    mypalette = colorBin( palette="Oranges", domain=world_spdf@data$n, na.color="transparent", bins=mybins)
+    mypalette = colorBin( palette="Oranges", domain=world_spdf@data$n, bins=mybins)
     
     # Prepar the text for the tooltip:
     mytext=paste("Country: ", world_spdf@data$NAME,"<br/>", "Number of Meets: ", world_spdf@data$n, sep="") %>%
@@ -202,8 +223,8 @@ server <- function(input, output) {
     leaflet(world_spdf) %>% 
       addTiles()  %>% 
       addPolygons( 
-        fillColor = ~mypalette(n), stroke=TRUE, fillOpacity = 0.9, color="white", weight=0.3,
-        highlight = highlightOptions( weight = 5, color = ~colorNumeric("Blues", n)(n), dashArray = "", fillOpacity = 0.3, bringToFront = TRUE),
+        fillColor = ~mypalette(n), stroke=TRUE, fillOpacity = 0.7, color="white", weight=0.3,
+        highlight = highlightOptions( weight = 5, color = ~colorNumeric("Oranges", n)(n), dashArray = "", fillOpacity = 0.3, bringToFront = TRUE),
         label = mytext,
         labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")
       ) %>%
@@ -212,7 +233,7 @@ server <- function(input, output) {
   
   output$intensity_map2 <- renderLeaflet({
     #Create data that needs to be displayed
-    meets <- filter(meet_data, Year==myYear())
+    meets <- filter(meet_data, Year==myYear(),Federation %in% myFeds() && Federation %in% type())
     
     #Following chart is passed to the renderGvis funciton which generates the appropriate html for output
     leaflet(data = meets) %>% 
