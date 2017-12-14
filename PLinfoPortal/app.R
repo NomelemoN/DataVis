@@ -84,6 +84,7 @@ ui <- dashboardPage(skin = "green",
                                 allFeds <- c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','FFFORCE','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF'),
                                 checkboxGroupInput("feds", "Choose Federations:", allFeds,inline = TRUE),
                                 checkboxGroupInput('bar','Types', c('Tested', 'Untested'), inline = TRUE),
+                                selectInput("countries", "Country", choices = union("All",meetCountries), label = "Countries",multiple = FALSE),
                                 br(), 
                                 
                                 fluidRow( 
@@ -93,16 +94,6 @@ ui <- dashboardPage(skin = "green",
                                       #another box that will fill 9/12 of row
                                       
                                       leafletOutput("intensity_map") 
-                                      #We define contents ofthis htmlOutput in server function
-                                      
-                                  )
-                                ),
-                                
-                                fluidRow(
-                                  box(width = 12, title = "Number of meets per country",
-                                      #another box that will fill 9/12 of row
-                                      
-                                      leafletOutput("intensity_map2") 
                                       #We define contents ofthis htmlOutput in server function
                                       
                                   )
@@ -139,6 +130,14 @@ server <- function(input, output) {
       input$feds
     else
       c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','FFFORCE','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF')
+  })
+  
+  myCountry <- reactive({
+    if(!is.null(input$countries)){
+      input$countries
+    }
+    else
+      meetCountries
   })
   
   type <-reactive({
@@ -200,17 +199,21 @@ server <- function(input, output) {
   # })
   output$intensity_map <- renderLeaflet({
     #colName = paste("Year", myYear(), sep="") for precomputed version
-    
+    print(myCountry())
+    print("Argentina" == myCountry())
     dataset <- filter(meet_data, Year==myYear(), Federation %in% myFeds() && Federation %in% type()) %>% #Filters meets for the selected year
       count(MeetCountry) #Counts the number of meet for each country
-      world_spdf@data$n = 0
+  
+    meets <- filter(meet_data, Year==myYear(), Federation %in% myFeds() && Federation %in% type())
+    
+    world_spdf@data$n = 0
     if(nrow(dataset) != 0){
       for(row in 1:nrow(dataset)){
         index = match(dataset[[row, "MeetCountry"]], world_spdf@data$NAME)
         world_spdf@data$n[index] = dataset[[row, "n"]]
       }
     }
-      
+    
     # Create a color palette with handmade bins.
     mybins=c(0,1,10,100,200,400, 800,Inf)
     mypalette = colorBin( palette="Oranges", domain=world_spdf@data$n, bins=mybins)
@@ -223,28 +226,16 @@ server <- function(input, output) {
     leaflet(world_spdf) %>% 
       addTiles()  %>% 
       addPolygons( 
-        fillColor = ~mypalette(n), stroke=TRUE, fillOpacity = 0.7, color="white", weight=0.3,
+        fillColor = ~mypalette(n), stroke=TRUE, fillOpacity = 0.7, color="white", weight=0.4,
         highlight = highlightOptions( weight = 5, color = ~colorNumeric("Oranges", n)(n), dashArray = "", fillOpacity = 0.3, bringToFront = TRUE),
         label = mytext,
-        labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "13px", direction = "auto")
+        labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "2px 7px"), textsize = "13px", direction = "auto")
       ) %>%
-      addLegend( pal=mypalette, values=~n, opacity=0.9, title = paste("Number of Meets in",myYear(), sep = " "), position = "bottomleft" )
+      addMarkers(data = meets, ~long, ~lat, popup = ~as.character(paste("<b> Number of participants: </b>", NumberParticipants, "<b> Date: </b>", Date, "<b> MeetCountry: </b>", MeetCountry, "<b> MeetState: </b>", MeetState, "<b> MeetTown: </b>", MeetTown, sep = "<br>")), label =~as.character(MeetName)) %>%
+      addLegend( pal=mypalette, values=~n, opacity=0.9, title = paste("Number of Meets in",myYear(), sep = "<br>"), position = "bottomleft" )
   })
   
-  output$intensity_map2 <- renderLeaflet({
-    #Create data that needs to be displayed
-    meets <- filter(meet_data, Year==myYear(),Federation %in% myFeds() && Federation %in% type())
-    
-    #Following chart is passed to the renderGvis funciton which generates the appropriate html for output
-    leaflet(data = meets) %>% 
-      addTiles() %>%
-      addMarkers(~long, ~lat, popup = ~as.character(NumberParticipants), label =~as.character(MeetName) )
-      # addPolygons(fillColor = ~pal(gdp08), 
-      #             fillOpacity = 0.8, 
-      #             color = "#BDBDC3", 
-      #             weight = 1)
-    
-  })
+
 }
 
 #==============Run the application (no change needed here)============================
