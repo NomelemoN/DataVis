@@ -305,7 +305,7 @@
 304,4339,"pa/1530","PA","28-06-15","Australia","QLD","Cairns","NQ Open II",2015,-16.9185514,145.7780548
 305,4340,"pa/1531","PA","28-06-15","Australia","NSW","Redfern","Top Lifter III Day 2",2015,-33.89334,151.20461
 306,4341,"pa/1532","PA","04-07-15","Australia","QLD","Brisbane","Champions of Iron",2015,-27.4697707,153.0251235
-307,4342,"pa/1533","PA","18-07-15","Australia","VIC","Melbourne","Obsidian Winter Night Open",2015,NA,NA
+307,4342,"pa/1533","PA","18-07-15","Australia","VIC","Melbourne","Obsidian Winter Night Open",2015,-37.8136276,144.9630576
 308,4343,"pa/1534","PA","25-07-15","Australia","NSW","Newcastle","Australian Equipped National Championships",2015,-32.9282712,151.7816802
 309,4344,"pa/1535","PA","02-08-15","Australia","QLD","Brisbane","UQ Strength Challenge",2015,-27.4697707,153.0251235
 310,4345,"pa/1536","PA","08-08-15","Australia","NSW","Penrith","Odin's Trial",2015,-33.75,150.7
@@ -1388,7 +1388,7 @@
 1387,202,"cpl/1602","CPL","20-08-16","Canada","AB","Red Deer","Canadian National Championships",2016,52.2681118,-113.8112386
 1388,203,"cpl/1603","CPL","26-11-16","Canada","AB","Edmonton","CPL Shell Shock",2016,53.544389,-113.4909267
 1389,1031,"cpu/2016-01-16-97ce0c95","CPU","16-01-16","Canada","BC","Richmond","New Year's Revolution",2016,49.1665898,-123.133569
-1390,1032,"cpu/2016-01-23-25801ba5","CPU","23-01-16","Canada","QC","Drummondville","Central Quebec Qualifier",2016,NA,NA
+1390,1032,"cpu/2016-01-23-25801ba5","CPU","23-01-16","Canada","QC","Drummondville","Central Quebec Qualifier",2016,45.8802909,-72.4842824
 1391,1033,"cpu/2016-01-23-ca71b246","CPU","23-01-16","Canada","NS","Dartmouth","Mike Laroche Open",2016,44.6652059,-63.5677427
 1392,1034,"cpu/2016-01-31-fcfe1fea","CPU","31-01-16","Canada","ON","London","London Open",2016,42.9849233,-81.2452768
 1393,1035,"cpu/2016-02-06-1cd60042","CPU","06-02-16","Canada","MB","Winnipeg","Brickhouse Power Challenge",2016,49.895136,-97.1383744
@@ -1414,7 +1414,7 @@
 1413,1055,"cpu/2016-06-11-39fc76a3","CPU","11-06-16","Canada","NL","St John's","Newfoundland Open and Masters Provincials",2016,47.5615096,-52.7125768
 1414,1056,"cpu/2016-06-11-41b0a00e","CPU","11-06-16","Canada","QC","Ste-Marie","Ste-Marie Sport Festival",2016,46.4390284,-71.0213182
 1415,1057,"cpu/2016-06-11-5786258c","CPU","11-06-16","Canada","AB","Cold Lake","Alberta Provincials",2016,54.4643173,-110.1731468
-1416,1058,"cpu/2016-06-11-8983c6ba","CPU","11-06-16","Canada","ON","Ottawa","Ottawa Open June",2016,NA,NA
+1416,1058,"cpu/2016-06-11-8983c6ba","CPU","11-06-16","Canada","ON","Ottawa","Ottawa Open June",2016,45.4215296,-75.6971931
 1417,1059,"cpu/2016-06-25-f7c045d7","CPU","25-06-16","Canada","BC","Surrey","BC Provincials",2016,49.1044302,-122.801094
 1418,1060,"cpu/2016-06-29-ffe9ce44","CPU","29-06-16","Canada","MB","Portage La Prairie","Portage Strength Classic",2016,49.9723205,-98.2903251
 1419,1061,"cpu/2016-07-09-a3c20a41","CPU","09-07-16","Canada","QC","Drummondville","Central Quebec Open",2016,45.8802909,-72.4842824
@@ -1437,7 +1437,7 @@
 1436,1078,"cpu/2016-09-24-33a1ff9e","CPU","24-09-16","Canada","NL","St. John's","Eastern Canadian Championship",2016,47.5615096,-52.7125768
 1437,1079,"cpu/2016-09-24-f97bedce","CPU","24-09-16","Canada","MB","Winnipeg","Manitoba Provincials",2016,49.895136,-97.1383744
 1438,1080,"cpu/2016-10-01-2fbb09d7","CPU","01-10-16","Canada","SK","Saskatoon","Saskatchewan Provincials",2016,52.1332144,-106.6700458
-1439,1081,"cpu/2016-10-01-87ba784e","CPU","01-10-16","Canada","ON","Scarborough","Scarborough Fall Qualifier",2016,NA,NA
+1439,1081,"cpu/2016-10-01-87ba784e","CPU","01-10-16","Canada","ON","Scarborough","Scarborough Fall Qualifier",2016,43.7764258,-79.2317521
 1440,1082,"cpu/2016-10-07-0d35f1f3","CPU","07-10-16","Canada","ON","Brampton","Sheridan Bruins Collegiate Open",2016,43.7315479,-79.7624177
 1441,1083,"cpu/2016-10-15-81b29779","CPU","15-10-16","Canada","BC","Abbotsford","BCPA Fall Classic",2016,49.0504377,-122.3044697
 1442,1084,"cpu/2016-10-15-b95cc594","CPU","15-10-16","Canada","ON","Mississauga","Titans Of Mississauga Open",2016,43.5890452,-79.6441198
