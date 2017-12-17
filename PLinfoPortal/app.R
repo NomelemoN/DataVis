@@ -10,7 +10,7 @@ library(rgdal)
 library(countrycode)
 library(htmltools)
 library(htmlwidgets)
-
+library(leaflet.minicharts)
 #=================Global Variables==================================================
 
 
@@ -190,14 +190,14 @@ server <- function(input, output) {
         label = mytext,
         labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "2px 7px"), textsize = "13px", direction = "auto")
       ) %>%
-      addMarkers(data = meets, ~long, ~lat, popup = ~as.character(paste("<b> Number of participants: </b>", NumberParticipants, "<b> Date: </b>", Date, "<b> MeetCountry: </b>", MeetCountry, "<b> MeetState: </b>", MeetState, "<b> MeetTown: </b>", MeetTown, sep = "<br>")), label =~as.character(MeetName)) %>%
+      addMarkers(data = meets, ~long, ~lat, popup = ~as.character(paste("<b> Number of participants: </b>", NumberParticipants, "<b> Date: </b>", Date, "<b> MeetCountry: </b>", MeetCountry, "<b> MeetState: </b>", MeetState, "<b> MeetTown: </b>", MeetTown, sep = "<br>")), label =~as.character(MeetName), clusterOptions = markerClusterOptions(showCoverageOnHover = FALSE)) %>%
       addLegend( pal=mypalette, values=~n, opacity=0.9, title = paste("Number of Meets in",myYear(), sep = "<br>"), position = "bottomleft" )
       
     }else{
       
       leaflet(world_spdf) %>% 
         #setView(lat = 53.0000, lng = 9.0000, zoom = 3) %>% #europe
-        addTiles()  %>% 
+        addTiles(options = tileOptions(noWrap = TRUE))  %>% 
         addPolygons( 
           fillColor = ~mypalette(n), stroke=TRUE, fillOpacity = 0.7, color="white", weight=0.4,
           highlight = highlightOptions( weight = 5, color = ~colorNumeric("Oranges", n)(n), dashArray = "", fillOpacity = 0.3, bringToFront = TRUE),
@@ -212,6 +212,8 @@ server <- function(input, output) {
   
   output$vector_map <- renderLeaflet({
     dataset <- filter(meet_data, Federation %in% myFeds(), Federation %in% type()) #Filters by Federation
+    if(length(dataset$Year) != 0){
+      print(dataset)
     oldLats <- vector(mode = "numeric", length = max(dataset$Year) - min(dataset$Year))
     oldLongs <- vector(mode = "numeric", length = max(dataset$Year) - min(dataset$Year))
     yearDiff = max(dataset$Year) - min(dataset$Year)
@@ -226,17 +228,49 @@ server <- function(input, output) {
     
     loc.data <- data.frame(obs = c("lat", "long"), oldLats, oldLongs, years)
     loc.data <- loc.data[is.finite(loc.data$oldLats),]
-    
-    print(loc.data$oldLats)
-    print(loc.data$oldLongs)
+    loc.data2 <- data.frame(oldLats1 = loc.data$oldLats[1:length(loc.data$oldLats)-1], oldLats2 = loc.data$oldLats[2:length(loc.data$oldLats)], oldLongs1 = loc.data$oldLongs[1:length(loc.data$oldLats)-1], oldLongs2 = loc.data$oldLongs[2:length(loc.data$oldLats)])
     locdiff.data <- data.frame(group = c("lat", "long"), latdiff = c(loc.data$oldLats[1:length(loc.data$oldLats)-1],loc.data$oldLats[2:length(loc.data$oldLats)]),longdiff = c(loc.data$oldLongs[1:length(loc.data$oldLats)-1],loc.data$oldLongs[2:length(loc.data$oldLats)]))
+    colors = colorRampPalette(c("yellow",'red'))
     
-
     leaflet(world_spdf)%>%
-      addTiles() %>%
-      addPolylines(color = "orange", opacity = 0.5, data = locdiff.data, ~longdiff, ~latdiff, group = ~group) %>%
-      addMarkers(data = loc.data, ~oldLongs, ~oldLats, label =~as.character(years))
-  })
+      addTiles(options = tileOptions(noWrap = TRUE)) %>%
+      addFlows(
+        lng0 = loc.data2$oldLongs1,lat0 = loc.data2$oldLats1, lng1 = loc.data2$oldLongs2, lat1 = loc.data2$oldLats2,
+        flow = 1,
+        popup =  popupArgs(noPopup = TRUE),
+        maxThickness = 3,
+        color = "orange",
+        opacity = 0.8
+      ) %>%
+      addMinicharts(
+        loc.data$oldLongs, loc.data$oldLats,
+        chartdata = loc.data$years,
+        showLabels = TRUE,
+        labelText = as.character(loc.data$years),
+        width = 25,
+        fillColor = colors(length(loc.data$years)),
+        opacity = 0.8
+      ) %>%
+      addMinicharts(
+        loc.data$oldLongs[1], loc.data$oldLats[1],
+        chartdata = loc.data$years[1],
+        showLabels = TRUE,
+        labelText = as.character(loc.data$years[1]),
+        width = 30,
+        fillColor = "yellow",
+        opacity = 1
+      ) %>%
+      addMinicharts(
+        loc.data$oldLongs[length(loc.data$years)], loc.data$oldLats[length(loc.data$years)],
+        chartdata = loc.data$years[length(loc.data$years)],
+        showLabels = TRUE,
+        labelText = as.character(loc.data$years[length(loc.data$years)]),
+        width = 30,
+        fillColor = "red",
+        opacity = 1
+      )
+    }
+    })
 
 }
 
