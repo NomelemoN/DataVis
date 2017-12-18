@@ -34,6 +34,7 @@ world_spdf@data$NAME[142] = 'Malta'
 countrycodes = countrycode(world_spdf@data$NAME,'country.name','iso3c') #doesnt recognize all countries
 meetCountries = unique(meet_data$MeetCountry)
 
+#Making sure country names are identical in the world map data and powerlifting data
 for(row in 1:length(meetCountries)){ 
   index = match(countrycode(meetCountries[row],'country.name','iso3c'),countrycodes)
   world_spdf@data$NAME[index] = meetCountries[row]
@@ -60,16 +61,22 @@ ui <- dashboardPage(skin = "green",
                                 #Static content and layout for for both interactive and 
                                 #static stuff on a tab defined here
                                 
-                                h2("Powerlifting is gaining popularity worldwide"), ##Add this text in second level heading format
+                                h2("Powerlifting across the world"), ##Add this text in second level heading format
                                 
+                                #Year Input slider
                                 sliderInput("year", "Year", ##Create a input element
                                             min = min(meet_data$Year), max = max(meet_data$Year), step = 1,
                                             value = max(meet_data$Year), animate = animationOptions(interval = 3000, loop = FALSE)),
                                 
                                 br(), ## Add a break line
                               
+                                #Checkbox for federations
                                 checkboxGroupInput("feds", "Choose Federations:", all, inline = TRUE),
+                                
+                                #Checkbox for meet types
                                 checkboxGroupInput('type','Types', c('Tested', 'Untested'), inline = TRUE),
+                                
+                                #Pane for selecting countries
                                 selectInput("countries", "Country", choices = union("All",meetCountries), label = "Countries",multiple = FALSE),
                                 br(), 
                                 
@@ -98,7 +105,7 @@ ui <- dashboardPage(skin = "green",
                                 p("Asdfgh")
                         ),
                         tabItem(tabName = "profile",
-                                p("This app has been developed for Data Visualization course at TU Delft.")
+                                p("This app has been developed for the Data Visualization course at TU Delft.")
                         )
                       )
                     )
@@ -156,15 +163,19 @@ server <- function(input, output) {
   #This is the logic for the intensity_map shown in tab 1, Powerlifting across the world
   output$intensity_map <- renderLeaflet({
 
-    dataset <- filter(meet_data, Year==myYear(), Federation %in% myFeds(), Federation %in% type(), MeetCountry %in% myCountry()) %>% #Filters meets for the selected year
-      count(MeetCountry) #Counts the number of meet for each country
+    #Filters meets for the selected year, federations, and type
+    dataset <- filter(meet_data, Year==myYear(), Federation %in% myFeds(), Federation %in% type(), MeetCountry %in% myCountry()) %>%
+      #Counts the number of meet for each country
+      count(MeetCountry) 
     
+    #same as above, but without counting the number of countries
     meets <- filter(meet_data, Year==myYear(), Federation %in% myFeds(), Federation %in% type(), MeetCountry %in% myCountry())
 
-    
+    #We add a new data column to the world map data which holds the number of meets in a country
     world_spdf@data$n = 0
     if(nrow(dataset) != 0){
       for(row in 1:nrow(dataset)){
+        #If country names are the same between the meet dataset and the world map, add meetnumber to the country column in the same index 
         index = match(dataset[[row, "MeetCountry"]], world_spdf@data$NAME)
         world_spdf@data$n[index] = dataset[[row, "n"]]
       }
@@ -172,10 +183,10 @@ server <- function(input, output) {
     
     #colors
     mybins=c(0,1,10,100,200,400,800,Inf) #set up color bins
-    mypalette = colorBin( palette="Oranges", domain=world_spdf@data$n, bins=mybins)
+    mypalette = colorBin( palette="Oranges", domain=world_spdf@data$n, bins=mybins) #choose color palette to base on
     
     #country title
-    mytext=paste("Country: ", world_spdf@data$NAME,"<br/>", "Number of Meets: ", world_spdf@data$n, sep="") %>%
+    mytext=paste("<b>Country: </b>", world_spdf@data$NAME,"<br/>", "<b>Number of Meets: </b>", world_spdf@data$n, sep="") %>%
       lapply(htmltools::HTML)
     
     # Final Map
@@ -183,17 +194,28 @@ server <- function(input, output) {
       
     leaflet(world_spdf) %>% 
       #setView(lat = 53.0000, lng = 9.0000, zoom = 3) %>% #europe
+        
       addTiles(options = tileOptions(noWrap = TRUE))  %>% #dont show the world map repeated
       addPolygons( #add selectable country polygons
-        fillColor = ~mypalette(n), stroke=TRUE, fillOpacity = 0.7, color="white", weight=0.4,
-        highlight = highlightOptions( weight = 5, color = ~colorNumeric("Oranges", n)(n), dashArray = "", fillOpacity = 0.3, bringToFront = TRUE),
-        label = mytext,
-        labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "2px 7px"), textsize = "13px", direction = "auto")
+        fillColor = ~mypalette(n), stroke=TRUE, fillOpacity = 0.7, color="white", weight=0.4, #color the country polygons based on meet nmber
+        highlight = highlightOptions( weight = 5, color = ~colorNumeric("Oranges", n)(n), dashArray = "", fillOpacity = 0.3, bringToFront = TRUE), #highlight options
+        label = mytext, #show the country text
+        labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "2px 7px"), textsize = "13px", direction = "auto") #specify label options
       ) %>%
-      addMarkers(data = meets, ~long, ~lat, popup = ~as.character(paste("<b> Number of participants: </b>", NumberParticipants, "<b> Date: </b>", Date, "<b> MeetCountry: </b>", MeetCountry, "<b> MeetState: </b>", MeetState, "<b> MeetTown: </b>", MeetTown, sep = "<br>")), label =~as.character(MeetName), clusterOptions = markerClusterOptions(showCoverageOnHover = FALSE)) %>%
+        
+      #add individual meet datapoints
+      addMarkers(
+        data = meets, 
+        ~long, ~lat, 
+        popup = ~as.character(paste("<b> Number of participants: </b>", NumberParticipants, "<b> Date: </b>", Date, "<b> MeetCountry: </b>", MeetCountry, "<b> MeetState: </b>", MeetState, "<b> MeetTown: </b>", MeetTown, sep = "<br>")), 
+        label =~as.character(MeetName), 
+        clusterOptions = markerClusterOptions(showCoverageOnHover = FALSE)
+        ) %>%
+        
+      #Add legend for the colors of individual countries
       addLegend( pal=mypalette, values=~n, opacity=0.9, title = paste("Number of Meets in",myYear(), sep = "<br>"), position = "bottomleft" )
       
-    }else{
+    }else{ #Draw map without markers if there are none present
       
       leaflet(world_spdf) %>% 
         #setView(lat = 53.0000, lng = 9.0000, zoom = 3) %>% #europe
@@ -209,41 +231,55 @@ server <- function(input, output) {
     }
       
   })
-  
+  #This is the logic for the vector map shown in Tab 1, showing geographic shift over time
   output$vector_map <- renderLeaflet({
-    dataset <- filter(meet_data, Federation %in% myFeds(), Federation %in% type()) #Filters by Federation
+    dataset <- filter(meet_data, Federation %in% myFeds(), Federation %in% type()) #Filters by Federation and type of meet
     if(length(dataset$Year) != 0){
-      print(dataset)
-    oldLats <- vector(mode = "numeric", length = max(dataset$Year) - min(dataset$Year))
-    oldLongs <- vector(mode = "numeric", length = max(dataset$Year) - min(dataset$Year))
-    yearDiff = max(dataset$Year) - min(dataset$Year)
+    lats <- vector(mode = "numeric", length = max(dataset$Year) - min(dataset$Year))
+    longs <- vector(mode = "numeric", length = max(dataset$Year) - min(dataset$Year))
+
     years = min(dataset$Year):max(dataset$Year)
+    
+    #Compute the average location of powerlifting meets per year
     for(year in years){
       yearDataset <- filter(dataset, Year == year)
-      oldLats[year + 1 - min(dataset$Year)] = mean(yearDataset[["lat"]])
-      oldLongs[year + 1 - min(dataset$Year)] = mean(yearDataset[["long"]])
+      lats[year + 1 - min(dataset$Year)] = mean(yearDataset[["lat"]])
+      longs[year + 1 - min(dataset$Year)] = mean(yearDataset[["long"]])
     }
     
 
+    #create a dataframe containing all lat and long values, without NaN values
+    loc.data <- data.frame(obs = c("lat", "long"), lats, longs, years)
+    loc.data <- loc.data[is.finite(loc.data$lats),]
     
-    loc.data <- data.frame(obs = c("lat", "long"), oldLats, oldLongs, years)
-    loc.data <- loc.data[is.finite(loc.data$oldLats),]
-    loc.data2 <- data.frame(oldLats1 = loc.data$oldLats[1:length(loc.data$oldLats)-1], oldLats2 = loc.data$oldLats[2:length(loc.data$oldLats)], oldLongs1 = loc.data$oldLongs[1:length(loc.data$oldLats)-1], oldLongs2 = loc.data$oldLongs[2:length(loc.data$oldLats)])
-    locdiff.data <- data.frame(group = c("lat", "long"), latdiff = c(loc.data$oldLats[1:length(loc.data$oldLats)-1],loc.data$oldLats[2:length(loc.data$oldLats)]),longdiff = c(loc.data$oldLongs[1:length(loc.data$oldLats)-1],loc.data$oldLongs[2:length(loc.data$oldLats)]))
+    #easier way to work with for the addFlows() function
+    latLength <- length(loc.data$lats)
+    
+    #Create a dataframe containing for columns: lats1 (old latitude values), lats2 (new latitude values), longs1 (old longitude values), and longs2 (new longitude values)
+    loc.data2 <- data.frame(lats1 = loc.data$lats[1:latLength-1], lats2 = loc.data$lats[2:latLength], longs1 = loc.data$longs[1:latLength-1], longs2 = loc.data$longs[2:latLength])
+    
+    #define the two color extremes over which the year circles run
     colors = colorRampPalette(c("yellow",'red'))
     
+    #The actual map
     leaflet(world_spdf)%>%
+      
+      #Dont show the worldmap repeatedly
       addTiles(options = tileOptions(noWrap = TRUE)) %>%
+      
+      #Add the vectors show in the map
       addFlows(
-        lng0 = loc.data2$oldLongs1,lat0 = loc.data2$oldLats1, lng1 = loc.data2$oldLongs2, lat1 = loc.data2$oldLats2,
+        lng0 = loc.data2$longs1,lat0 = loc.data2$lats1, lng1 = loc.data2$longs2, lat1 = loc.data2$lats2,
         flow = 1,
         popup =  popupArgs(noPopup = TRUE),
         maxThickness = 3,
         color = "orange",
         opacity = 0.8
       ) %>%
+      
+      #Show all averaged meet locations on the world map
       addMinicharts(
-        loc.data$oldLongs, loc.data$oldLats,
+        loc.data$longs, loc.data$lats,
         chartdata = loc.data$years,
         showLabels = TRUE,
         labelText = as.character(loc.data$years),
@@ -251,8 +287,10 @@ server <- function(input, output) {
         fillColor = colors(length(loc.data$years)),
         opacity = 0.8
       ) %>%
+      
+      #Show the starting year with greater size and color
       addMinicharts(
-        loc.data$oldLongs[1], loc.data$oldLats[1],
+        loc.data$longs[1], loc.data$lats[1],
         chartdata = loc.data$years[1],
         showLabels = TRUE,
         labelText = as.character(loc.data$years[1]),
@@ -260,8 +298,10 @@ server <- function(input, output) {
         fillColor = "yellow",
         opacity = 1
       ) %>%
+      
+      #show the final year with greater size and color
       addMinicharts(
-        loc.data$oldLongs[length(loc.data$years)], loc.data$oldLats[length(loc.data$years)],
+        loc.data$longs[length(loc.data$years)], loc.data$lats[length(loc.data$years)],
         chartdata = loc.data$years[length(loc.data$years)],
         showLabels = TRUE,
         labelText = as.character(loc.data$years[length(loc.data$years)]),
