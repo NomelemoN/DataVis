@@ -362,8 +362,8 @@ server <- function(input, output) {
   output$drugs_comparison <- renderPlot({
     
     # filters data as tested vs untested
-    data_untested <- filter(untestedData, Sex %in% gender_input(), Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max() && BodyweightKg >= bodyweight_input_min())
-    data_tested <- filter(testedData, Sex %in% gender_input(), Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max() && BodyweightKg >= bodyweight_input_min())
+    data_untested <- filter(untestedData, Sex %in% gender_input(), Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(), !is.na(TotalKg))
+    data_tested <- filter(testedData, Sex %in% gender_input(), Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(), !is.na(TotalKg))
     
     # checks if there are data points in selected bodyweight range, if not shows error message.
     validate(
@@ -377,7 +377,8 @@ server <- function(input, output) {
     d2 <- distribution(data_tested[[col_index]])
     
     # creates plot 
-    plot(range(0, 1000), range(d1$y, d2$y), type = "n", xlab = "Kilogram", ylab = "Density")
+    print(max(lifter_data$TotalKg))
+    plot(range(0, max(lifter_data$TotalKg[!is.na(lifter_data$TotalKg)])), range(d1$y, d2$y), type = "n", xlab = "Kilogram", ylab = "Density")
     lines(d1, col = "red")
     lines(d2, col = "blue")
     polygon(d1, col=rgb(1, 0, 0,0.5), border=NA) #fills the area under line
