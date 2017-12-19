@@ -21,18 +21,19 @@ meet_data$MeetCountry = gsub('England','United Kingdom',meet_data$MeetCountry)
 meet_data$MeetCountry = gsub('N.Ireland','United Kingdom',meet_data$MeetCountry)
 
 ###oyku
-lifter_data <- read.csv(file = 'openpowerlifting.csv', header = TRUE, sep = ',')
+lifter_data <- read.csv(file = 'modified.csv', header = TRUE, sep = ',')
 
 distribution <- function(inputColumn){
   d <- density(na.omit(abs(inputColumn))) # returns the density distribution
   return(d)
 }
 
-#fake data
-testedFeds_ <- c(0, 5, 6, 8, 12) #normally they will be the names of federations 
-untestedFeds_ <- c(1, 2, 3, 4, 7, 10)
-testedData <- filter(lifter_data, MeetID %in% testedFeds_)
-untestedData <- filter(lifter_data, MeetID %in% untestedFeds_)
+testedFeds <- c('AAU','AsianPF','CommonwealthPF','CPU','EPF','FESUPO','FFForce','GBPF','IPF','IrishPF','NAPF','NASA','NIPF','NSF','NZPF','OceaniaPF','PA','RAW','THSPA','USAPL','WNPF')
+allFeds <- c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO', 'FFForce','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF')
+untestedFeds <- setdiff(allFeds, testedFeds)
+
+testedData <- filter(lifter_data, Federation %in% testedFeds)
+untestedData <- filter(lifter_data, Federation %in% untestedFeds)
 
 # to use for check boxes
 genders = unique(lifter_data$Sex)
@@ -193,17 +194,17 @@ server <- function(input, output) {
   lift_kg_input <- reactive({
     if(!is.null(input$lift_kg)){
       if("Total" %in% input$lift_kg){
-        15
+        28
       }else if("Squat" %in% input$lift_kg){
-        10
+        17
       }else if("Bench" %in% input$lift_kg){
-        12
+        22
       }else if("Deadlift" %in% input$lift_kg){
-        14
+        27
       }
     }
     else
-      15
+      28
   })
   
   # returns selected equipments
@@ -393,4 +394,3 @@ server <- function(input, output) {
 
 shinyApp(ui = ui, server = server)
 
->>>>>>> 0c43ed644feda0447d7a4917cc5099600e28f825
