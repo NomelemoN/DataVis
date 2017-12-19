@@ -8,8 +8,6 @@ library(readr)
 library(leaflet)
 library(rgdal)
 library(countrycode)
-library(htmltools)
-library(htmlwidgets)
 library(leaflet.minicharts)
 #=================Global Variables==================================================
 
@@ -26,7 +24,7 @@ tested = c('AAU','AsianPF','CommonwealthPF','CPU','EPF','FESUPO','FFForce','GBPF
 all = c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO', 'FFForce','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF')
 untested = setdiff(all, tested)
 
-#Load polygons for world map
+#Load polygons for world map - provided by Bjorn Sandvik of thematicmapping.org
 world_spdf=readOGR( dsn= "TM_WORLD_BORDERS_SIMPL-0.3" , layer="TM_WORLD_BORDERS_SIMPL-0.3")
 #Saint martin was not found in the country code package, and as no meets were held there, we changed its name to a different country
 world_spdf@data$NAME = gsub('Saint Martin', 'Malta', world_spdf@data$NAME)
@@ -274,9 +272,8 @@ server <- function(input, output) {
         popup =  popupArgs(noPopup = TRUE),
         maxThickness = 3,
         color = "orange",
-        opacity = 0.8
+        opacity = 0.5
       ) %>%
-      
       #Show all averaged meet locations on the world map
       addMinicharts(
         loc.data$longs, loc.data$lats,
@@ -285,7 +282,15 @@ server <- function(input, output) {
         labelText = as.character(loc.data$years),
         width = 25,
         fillColor = colors(length(loc.data$years)),
-        opacity = 0.8
+        opacity = 0.5
+      ) %>%
+      
+      addFlows(
+        lng0 = loc.data2$longs1[1], lat0 = loc.data2$lats1[1], lng1 = loc.data2$longs2[length(loc.data2$longs2)], lat1 = loc.data2$lats2[length(loc.data2$lats2)],
+        popup =  popupArgs(noPopup = TRUE),
+        maxThickness = 5,
+        color = "purple",
+        opacity = 1
       ) %>%
       
       #Show the starting year with greater size and color
@@ -308,7 +313,8 @@ server <- function(input, output) {
         width = 30,
         fillColor = "red",
         opacity = 1
-      )
+      ) 
+    
     }
     })
 
