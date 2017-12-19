@@ -1,6 +1,6 @@
 library(ggmap)
 rm(list=ls())
-df <- read.csv("meetsOriginal.csv", check.names = FALSE)
+df <- read.csv("meetsOriginal2.csv", check.names = FALSE)
 
 for(row in 1:nrow(df)){
   lat <- df[row, "lat"]
@@ -11,7 +11,7 @@ for(row in 1:nrow(df)){
     if(place$status != "OVER_QUERY_LIMIT" && length(place$results) != 0){
       df[row, "lat"] <- place$results[[1]]$geometry$location$lat
       df[row, "long"] <- place$results[[1]]$geometry$location$lng
-      write.csv(df, file = "meetsOriginal.csv",row.names = FALSE)
+      write.csv(df, file = "meetsOriginal2.csv",row.names = FALSE)
     }
   }
 }
