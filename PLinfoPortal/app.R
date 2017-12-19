@@ -20,6 +20,26 @@ meet_data = read_csv("meets.csv")
 meet_data$MeetCountry = gsub('England','United Kingdom',meet_data$MeetCountry)
 meet_data$MeetCountry = gsub('N.Ireland','United Kingdom',meet_data$MeetCountry)
 
+###oyku
+lifter_data <- read.csv(file = 'openpowerlifting.csv', header = TRUE, sep = ',')
+
+distribution <- function(inputColumn){
+  d <- density(na.omit(abs(inputColumn))) # returns the density distribution
+  return(d)
+}
+
+#fake data
+testedFeds_ <- c(0, 5, 6, 8, 12) #normally they will be the names of federations 
+untestedFeds_ <- c(1, 2, 3, 4, 7, 10)
+testedData <- filter(lifter_data, MeetID %in% testedFeds_)
+untestedData <- filter(lifter_data, MeetID %in% untestedFeds_)
+
+# to use for check boxes
+genders = unique(lifter_data$Sex)
+equipments = unique(lifter_data$Equipment)
+
+
+###oyku
 
 #Types of federations
 tested = c('AAU','AsianPF','CommonwealthPF','CPU','EPF','FESUPO','FFForce','GBPF','IPF','IrishPF','NAPF','NASA','NIPF','NSF','NZPF','OceaniaPF','PA','RAW','THSPA','USAPL','WNPF')
@@ -92,7 +112,22 @@ ui <- dashboardPage(skin = "green",
                                 )
                         ),
                         tabItem(tabName = "drugs",
-                                p("Qwerty")
+                                h2("Tested vs Untested"), 
+                                selectInput("lift_kg", c("Total", "Squat", "Bench", "Deadlift"), label = "Lifts", multiple = FALSE),
+                                br(),
+                                checkboxGroupInput('equipment','Equipment', equipments, inline = TRUE),
+                                br(),
+                                checkboxGroupInput('gender','Gender', genders, inline = TRUE),
+                                br(),
+                                sliderInput("bodyweight", "Bodyweight",
+                                            min = min(lifter_data$BodyweightKg, na.rm = TRUE), max = max(lifter_data$BodyweightKg, na.rm = TRUE), step = 1,
+                                            value = c(min(lifter_data$BodyweightKg, na.rm = TRUE), max(lifter_data$BodyweightKg, na.rm = TRUE))),
+                                br(),
+                                fluidRow(
+                                  box(width = 12, title = "Comparision between tested and untested federations",
+                                      plotOutput("drugs_comparison")
+                                  )
+                                )
                         ),
                         tabItem(tabName = "strategy",
                                 p("Asdfgh")
@@ -151,6 +186,58 @@ server <- function(input, output) {
       print("c4")
       all
     }
+  })
+  
+  
+  ## Return selected lift type to show at plot
+  lift_kg_input <- reactive({
+    if(!is.null(input$lift_kg)){
+      if("Total" %in% input$lift_kg){
+        15
+      }else if("Squat" %in% input$lift_kg){
+        10
+      }else if("Bench" %in% input$lift_kg){
+        12
+      }else if("Deadlift" %in% input$lift_kg){
+        14
+      }
+    }
+    else
+      15
+  })
+  
+  # returns selected equipments
+  equipment_input <- reactive({
+    if(!is.null(input$equipment))
+      input$equipment
+    else
+      equipments
+  })
+  
+  # returns selected gender
+  gender_input <- reactive({
+    if(!is.null(input$gender))
+      input$gender
+    else
+      genders
+  })
+  
+  # returns selected min bodyweight for range
+  bodyweight_input_min <- reactive({
+    if(!is.null(input$bodyweight)){ 
+      input$bodyweight[1]
+    }
+    else
+      min(lifter_data$BodyweightKg, na.rm = TRUE)
+  })
+  
+  # returns selected max bodyweight for range
+  bodyweight_input_max <- reactive({
+    if(!is.null(input$bodyweight)){
+      input$bodyweight[2]
+    }
+    else
+      max(lifter_data$BodyweightKg, na.rm = TRUE)
   })
   
   #This is the logic for the intensity_map shown in tab 1, Powerlifting across the world
@@ -271,6 +358,33 @@ server <- function(input, output) {
       )
     }
     })
+  
+  output$drugs_comparison <- renderPlot({
+    
+    # filters data as tested vs untested
+    data_untested <- filter(untestedData, Sex %in% gender_input(), Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max() && BodyweightKg >= bodyweight_input_min())
+    data_tested <- filter(testedData, Sex %in% gender_input(), Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max() && BodyweightKg >= bodyweight_input_min())
+    
+    # checks if there are data points in selected bodyweight range, if not shows error message.
+    validate(
+      need(nrow(data_untested )!=0 && nrow(data_tested )!=0, "Please select and appropriate range for bodyweights.")
+    )
+    
+    col_index <- lift_kg_input() # which column is used (TotalKg, BestSquatKg, BestBenchKg, BestDeadliftKg)
+    
+    # creates distributions
+    d1 <- distribution(data_untested[[col_index]])
+    d2 <- distribution(data_tested[[col_index]])
+    
+    # creates plot 
+    plot(range(0, 1000), range(d1$y, d2$y), type = "n", xlab = "Kilogram", ylab = "Density")
+    lines(d1, col = "red")
+    lines(d2, col = "blue")
+    polygon(d1, col=rgb(1, 0, 0,0.5), border=NA) #fills the area under line
+    polygon(d2, col=rgb(0, 0, 1,0.5), border=NA) #fills the area under line
+    legend("topleft", legend=c("Untested", "Tested"),
+           col=c("red", "blue"), lty=1)
+  })
 
 }
 
