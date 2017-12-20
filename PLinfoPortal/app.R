@@ -25,6 +25,12 @@ meet_data$MeetCountry = gsub('N.Ireland','United Kingdom',meet_data$MeetCountry)
 
 ###oyku
 lifter_data <- read.csv(file = 'modified.csv', header = TRUE, sep = ',')
+lifter_data <- filter(lifter_data, 
+        !is.na(BestBenchKg), 
+        !is.na(BestSquatKg), 
+        !is.na(BestDeadliftKg), 
+        !is.na(TotalKg)
+)
 
 distribution <- function(inputColumn){
   d <- density(na.omit(abs(inputColumn))) # returns the density distribution
@@ -113,25 +119,23 @@ ui <- dashboardPage(skin = "green",
                         ),
                         tabItem(tabName = "drugs",
                                 h2("Tested vs Untested"), 
-                                selectInput("lift_kg", c("Total", "Squat", "Bench", "Deadlift"), label = "Lifts", multiple = FALSE),
-                                br(),
                                 checkboxGroupInput('equipment','Equipment', equipments, inline = TRUE),
-                                br(),
-                                checkboxGroupInput('gender','Gender', genders, inline = TRUE),
                                 br(),
                                 sliderInput("bodyweight", "Bodyweight",
                                             min = min(lifter_data$BodyweightKg, na.rm = TRUE), max = max(lifter_data$BodyweightKg, na.rm = TRUE), step = 1,
                                             value = c(min(lifter_data$BodyweightKg, na.rm = TRUE), max(lifter_data$BodyweightKg, na.rm = TRUE))),
                                 br(),
                                 fluidRow(
-                                  box(width = 12, title = "Comparison between tested and untested federations",
-                                      plotOutput("drugs_comparison")
+                                  box(width = 12,plotlyOutput("parcoord")
                                   )
                                 ),
                                 br(),
+                                selectInput("lift_kg", c("Total", "Squat", "Bench", "Deadlift"), label = "Lifts", multiple = FALSE),
+                                checkboxGroupInput('gender','Gender', genders, inline = TRUE),
+                                br(),
                                 fluidRow(
                                   box(width = 12, title = "Comparison between tested and untested federations",
-                                      plotlyOutput("parcoord")
+                                      plotOutput("drugs_comparison")
                                   )
                                 )
                         ),
@@ -289,7 +293,7 @@ server <- function(input, output) {
     }
     
     #colors
-    mybins=c(0,1,10,100,200,400,800,Inf) #set up color bins
+    mybins=c(0,1,10,100,200,400,800,1600) #set up color bins
     mypalette = colorBin( palette="Oranges", domain=world_spdf@data$n, bins=mybins) #choose color palette to base on
     
     #country title
@@ -340,8 +344,8 @@ server <- function(input, output) {
   })
   #This is the logic for the vector map shown in Tab 1, showing geographic shift over time
   output$vector_map <- renderLeaflet({
-    dataset <- filter(meet_data, Federation %in% myFeds(), Federation %in% type(), Year >= min_year(), Year <= max_year()) #Filters by Federation and type of meet
-    if(length(dataset$Year) != 0){
+    dataset <- filter(meet_data, Federation %in% myFeds(), Federation %in% type(), Year >= min_year(), Year <= max_year(), MeetCountry %in% myCountry()) #Filters by Federation and type of meet
+
       lats <- vector(mode = "numeric", length = max(dataset$Year) - min(dataset$Year))
       longs <- vector(mode = "numeric", length = max(dataset$Year) - min(dataset$Year))
       
@@ -364,111 +368,115 @@ server <- function(input, output) {
       
       #easier way to work with for the addFlows() function
       latLength <- length(loc.data$lats)
-      
-      #Create a dataframe containing for columns: lats1 (old latitude values), lats2 (new latitude values), longs1 (old longitude values), and longs2 (new longitude values)
-      loc.data2 <- data.frame(lats1 = loc.data$lats[1:latLength-1], lats2 = loc.data$lats[2:latLength], longs1 = loc.data$longs[1:latLength-1], longs2 = loc.data$longs[2:latLength])
-      
-      #define the two color extremes over which the year circles run
-      colors = colorRampPalette(c("yellow",'red'))
-      
-      #The actual map
-      leaflet(world_spdf)%>%
+      if(latLength > 1){
+          
+        #Create a dataframe containing for columns: lats1 (old latitude values), lats2 (new latitude values), longs1 (old longitude values), and longs2 (new longitude values)
+        loc.data2 <- data.frame(lats1 = loc.data$lats[1:latLength-1], lats2 = loc.data$lats[2:latLength], longs1 = loc.data$longs[1:latLength-1], longs2 = loc.data$longs[2:latLength])
         
-        #Dont show the worldmap repeatedly
-        addTiles(options = tileOptions(noWrap = TRUE)) %>%
+        #define the two color extremes over which the year circles run
+        colors = colorRampPalette(c("yellow",'red'))
         
-        #Add the vectors show in the map
-        addFlows(
-          lng0 = loc.data2$longs1,lat0 = loc.data2$lats1, lng1 = loc.data2$longs2, lat1 = loc.data2$lats2,
-          flow = 1,
-          popup =  popupArgs(noPopup = TRUE),
-          maxThickness = 3,
-          color = "orange",
-          opacity = 0.5
-        ) %>%
-        #Show all averaged meet locations on the world map
-        addMinicharts(
-          loc.data$longs, loc.data$lats,
-          chartdata = loc.data$years,
-          showLabels = TRUE,
-          labelText = as.character(loc.data$years),
-          width = 25,
-          fillColor = colors(length(loc.data$years)),
-          opacity = 0.5
-        ) %>%
-        
-        #Add vector between starting year and final year
-        addFlows(
-          lng0 = loc.data2$longs1[1], lat0 = loc.data2$lats1[1], lng1 = loc.data2$longs2[length(loc.data2$longs2)], lat1 = loc.data2$lats2[length(loc.data2$lats2)],
-          popup =  popupArgs(noPopup = TRUE),
-          maxThickness = 5,
-          color = "purple",
-          opacity = 1
-        ) %>%
-        
-        #Show the starting year with greater size and color
-        addMinicharts(
-          loc.data$longs[1], loc.data$lats[1],
-          chartdata = loc.data$years[1],
-          showLabels = TRUE,
-          labelText = as.character(loc.data$years[1]),
-          width = 30,
-          fillColor = "yellow",
-          opacity = 1
-        ) %>%
-        
-        #show the final year with greater size and color
-        addMinicharts(
-          loc.data$longs[length(loc.data$years)], loc.data$lats[length(loc.data$years)],
-          chartdata = loc.data$years[length(loc.data$years)],
-          showLabels = TRUE,
-          labelText = as.character(loc.data$years[length(loc.data$years)]),
-          width = 30,
-          fillColor = "red",
-          opacity = 1
-        ) 
-      
-    }
+        #The actual map
+        leaflet(world_spdf)%>%
+          
+          #Dont show the worldmap repeatedly
+          addTiles(options = tileOptions(noWrap = TRUE)) %>%
+          
+          #Add the vectors show in the map
+          addFlows(
+            lng0 = loc.data2$longs1,lat0 = loc.data2$lats1, lng1 = loc.data2$longs2, lat1 = loc.data2$lats2,
+            flow = 1,
+            popup =  popupArgs(noPopup = TRUE),
+            maxThickness = 3,
+            color = "orange",
+            opacity = 0.5
+          ) %>%
+          #Show all averaged meet locations on the world map
+          addMinicharts(
+            loc.data$longs, loc.data$lats,
+            chartdata = loc.data$years,
+            showLabels = TRUE,
+            labelText = as.character(loc.data$years),
+            width = 25,
+            fillColor = colors(length(loc.data$years)),
+            opacity = 0.5
+          ) %>%
+          
+          #Add vector between starting year and final year
+          addFlows(
+            lng0 = loc.data2$longs1[1], lat0 = loc.data2$lats1[1], lng1 = loc.data2$longs2[length(loc.data2$longs2)], lat1 = loc.data2$lats2[length(loc.data2$lats2)],
+            popup =  popupArgs(noPopup = TRUE),
+            maxThickness = 5,
+            color = "purple",
+            opacity = 1
+          ) %>%
+          
+          #Show the starting year with greater size and color
+          addMinicharts(
+            loc.data$longs[1], loc.data$lats[1],
+            chartdata = loc.data$years[1],
+            showLabels = TRUE,
+            labelText = as.character(loc.data$years[1]),
+            width = 30,
+            fillColor = "yellow",
+            opacity = 1
+          ) %>%
+          
+          #show the final year with greater size and color
+          addMinicharts(
+            loc.data$longs[length(loc.data$years)], loc.data$lats[length(loc.data$years)],
+            chartdata = loc.data$years[length(loc.data$years)],
+            showLabels = TRUE,
+            labelText = as.character(loc.data$years[length(loc.data$years)]),
+            width = 30,
+            fillColor = "red",
+            opacity = 1
+          ) 
+      }else{
+        leaflet(world_spdf)%>%
+          #Dont show the worldmap repeatedly
+          addTiles(options = tileOptions(noWrap = TRUE))
+      }
   })
   
   output$drugs_comparison <- renderPlot({
-    
+
     # filters data as tested vs untested
     data_untested <- filter(
-      untestedData, 
-      Sex %in% gender_input(), 
-      Equipment %in% equipment_input(), 
-      BodyweightKg <= bodyweight_input_max(), 
-      BodyweightKg >= bodyweight_input_min(), 
-      !is.na(BestBenchKg), 
-      !is.na(BestSquatKg), 
-      !is.na(BestDeadliftKg), 
+      untestedData,
+      Sex %in% gender_input(),
+      Equipment %in% equipment_input(),
+      BodyweightKg <= bodyweight_input_max(),
+      BodyweightKg >= bodyweight_input_min(),
+      !is.na(BestBenchKg),
+      !is.na(BestSquatKg),
+      !is.na(BestDeadliftKg),
       !is.na(TotalKg)
       )
     data_tested <- filter(
-      testedData, 
+      testedData,
       Sex %in% gender_input(),
-      Equipment %in% equipment_input(), 
-      BodyweightKg <= bodyweight_input_max(), 
-      BodyweightKg >= bodyweight_input_min(), 
-      !is.na(BestBenchKg), 
-      !is.na(BestSquatKg), 
-      !is.na(BestDeadliftKg), 
+      Equipment %in% equipment_input(),
+      BodyweightKg <= bodyweight_input_max(),
+      BodyweightKg >= bodyweight_input_min(),
+      !is.na(BestBenchKg),
+      !is.na(BestSquatKg),
+      !is.na(BestDeadliftKg),
       !is.na(TotalKg)
       )
-    
+
     # checks if there are data points in selected bodyweight range, if not shows error message.
     validate(
       need(nrow(data_untested )!=0 && nrow(data_tested )!=0, "Please select and appropriate range for bodyweights.")
     )
-    
+
     col_index <- lift_kg_input() # which column is used (TotalKg, BestSquatKg, BestBenchKg, BestDeadliftKg)
-    
+
     # creates distributions
     d1 <- distribution(data_untested[[col_index]])
     d2 <- distribution(data_tested[[col_index]])
-    
-    # creates plot 
+
+    # creates plot
     plot(range(0, max(lifter_data$TotalKg[!is.na(lifter_data$TotalKg)])), range(d1$y, d2$y), type = "n", xlab = "Kilogram", ylab = "Density")
     lines(d1, col = "red")
     lines(d2, col = "blue")
@@ -484,22 +492,14 @@ server <- function(input, output) {
       untestedData,
       Equipment %in% equipment_input(), 
       BodyweightKg <= bodyweight_input_max(), 
-      BodyweightKg >= bodyweight_input_min(),
-      !is.na(BestBenchKg), 
-      !is.na(BestSquatKg), 
-      !is.na(BestDeadliftKg), 
-      !is.na(TotalKg)
+      BodyweightKg >= bodyweight_input_min()
      )
     
     td <- filter(
       testedData,
       Equipment %in% equipment_input(), 
       BodyweightKg <= bodyweight_input_max(), 
-      BodyweightKg >= bodyweight_input_min(),
-      !is.na(BestBenchKg), 
-      !is.na(BestSquatKg), 
-      !is.na(BestDeadliftKg), 
-      !is.na(TotalKg)
+      BodyweightKg >= bodyweight_input_min()
     )
     
     #untested male
@@ -581,7 +581,7 @@ server <- function(input, output) {
     #create the parallel coordinate plot
     ggparcoord(data_all, columns = 1:(ncol(data_all)-1), groupColumn = ncol(data_all), scale = "globalminmax", alphaLines = 1) + 
       geom_line(size = 0.5)  +
-      ggtitle("Powerlifting performance of First Placers") + 
+      ggtitle("Powerlifting performance between groups") + 
       xlab("Dimensions") + ylab("Kilos") +
       scale_colour_manual(values = c("Untested Male" = "#5268ea", 
                                      "Tested Male" = "#60beea", 
