@@ -31,6 +31,7 @@ distribution <- function(inputColumn){
   return(d)
 }
 
+#Types of federations
 testedFeds <- c('AAU','AsianPF','CommonwealthPF','CPU','EPF','FESUPO','FFForce','GBPF','IPF','IrishPF','NAPF','NASA','NIPF','NSF','NZPF','OceaniaPF','PA','RAW','THSPA','USAPL','WNPF')
 allFeds <- c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO', 'FFForce','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF')
 untestedFeds <- setdiff(allFeds, testedFeds)
@@ -41,14 +42,6 @@ untestedData <- filter(lifter_data, Federation %in% untestedFeds)
 # to use for check boxes
 genders = unique(lifter_data$Sex)
 equipments = unique(lifter_data$Equipment)
-
-
-###oyku
-
-#Types of federations
-tested = c('AAU','AsianPF','CommonwealthPF','CPU','EPF','FESUPO','FFForce','GBPF','IPF','IrishPF','NAPF','NASA','NIPF','NSF','NZPF','OceaniaPF','PA','RAW','THSPA','USAPL','WNPF')
-all = c('GPA', 'GPC', 'IPF', 'IPL', 'WPC','WUAP','AsianPF','CommonwealthPF','EPF','FESUPO', 'FFForce','NAPF','OceaniaPF','365Strong','AAU','APA','APC','APF','HERC','IPA','MHP','NASA','RAW','RPS','RUPC','SPF', 'THSPA','UPA','USAPL','USPA','USPF','XPC','WNPF','CAPO','PA','ProRaw','CPF','CPL','CPU','FPO','IrishPF','NZPF','NSF','BB','SCT','WRPF','GBPF','NIPF')
-untested = setdiff(all, tested)
 
 #Load polygons for world map
 world_spdf=readOGR( dsn= "TM_WORLD_BORDERS_SIMPL-0.3" , layer="TM_WORLD_BORDERS_SIMPL-0.3")
@@ -91,8 +84,8 @@ ui <- dashboardPage(skin = "green",
                                             value = max(meet_data$Year), animate = animationOptions(interval = 3000, loop = FALSE)),
                                 
                                 br(), ## Add a break line
-                              
-                                checkboxGroupInput("feds", "Choose Federations:", all, inline = TRUE),
+                                
+                                checkboxGroupInput("feds", "Choose Federations:", allFeds, inline = TRUE),
                                 checkboxGroupInput('type','Types', c('Tested', 'Untested'), inline = TRUE),
                                 selectInput("countries", "Country", choices = union("All",meetCountries), label = "Countries",multiple = FALSE),
                                 br(), 
@@ -114,7 +107,7 @@ ui <- dashboardPage(skin = "green",
                                 br(),
                                 fluidRow(
                                   box(width = 12, title = "Meet locations averaged across Years",
-                                  leafletOutput("vector_map")
+                                      leafletOutput("vector_map")
                                   )
                                 )
                         ),
@@ -152,7 +145,6 @@ ui <- dashboardPage(skin = "green",
                     )
 )
 
-
 #==============Logic for interactive stuff goes into server function==================
 
 server <- function(input, output) {
@@ -164,12 +156,13 @@ server <- function(input, output) {
     else
       2017
   })
+  
   ## Return selected federations in Tab 1
   myFeds <- reactive({
     if(!is.null(input$feds))
       input$feds
     else
-      all
+      allFeds
   })
   
   ## Return selected countries in Tab 1
@@ -183,30 +176,26 @@ server <- function(input, output) {
   
   ## Return all feds of selected type in Tab 1
   type <-reactive({
-    print(input$type)
     if(!is.null(input$type)){
       if("Tested" %in% input$type && "Untested" %in% input$type){
-        print("c1")
-        all
+        allFeds
       }else if("Tested" %in% input$type){
-        print("c2")
-        tested
+        testedFeds
       }else if("Untested" %in% input$type){
-        print("c3")
-        untested
+        untestedFeds
       }
     }else{
-      print("c4")
-      all
+      allFeds
     }
   })
   
+  #Year range used in Tab 1
   min_year <- reactive({
     if(!is.null(input$yearRange)){ 
       input$yearRange[1]
     }
     else
-      min(lifter_data$Year, na.rm = TRUE)
+      min(meet_data$Year, na.rm = TRUE)
   })
   
   max_year <- reactive({
@@ -214,7 +203,7 @@ server <- function(input, output) {
       input$yearRange[2]
     }
     else
-      min(lifter_data$Year, na.rm = TRUE)
+      min(meet_data$Year, na.rm = TRUE)
   })
   
   ## Return selected lift type to show at plot
@@ -272,12 +261,22 @@ server <- function(input, output) {
   output$intensity_map <- renderLeaflet({
     
     #Filters meets for the selected year, federations, and type
-    dataset <- filter(meet_data, Year==myYear(), Federation %in% myFeds(), Federation %in% type(), MeetCountry %in% myCountry()) %>%
+    dataset <- filter(
+      meet_data, 
+      Year==myYear(), 
+      Federation %in% myFeds(), 
+      Federation %in% type(), 
+      MeetCountry %in% myCountry()) %>%
       #Counts the number of meet for each country
       count(MeetCountry) 
     
     #same as above, but without counting the number of countries
-    meets <- filter(meet_data, Year==myYear(), Federation %in% myFeds(), Federation %in% type(), MeetCountry %in% myCountry())
+    meets <- filter(
+      meet_data, 
+      Year==myYear(), 
+      Federation %in% myFeds(), 
+      Federation %in% type(), 
+      MeetCountry %in% myCountry())
     
     #We add a new data column to the world map data which holds the number of meets in a country
     world_spdf@data$n = 0
@@ -435,8 +434,28 @@ server <- function(input, output) {
   output$drugs_comparison <- renderPlot({
     
     # filters data as tested vs untested
-    data_untested <- filter(untestedData, Sex %in% gender_input(), Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(), !is.na(TotalKg))
-    data_tested <- filter(testedData, Sex %in% gender_input(), Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(), !is.na(TotalKg))
+    data_untested <- filter(
+      untestedData, 
+      Sex %in% gender_input(), 
+      Equipment %in% equipment_input(), 
+      BodyweightKg <= bodyweight_input_max(), 
+      BodyweightKg >= bodyweight_input_min(), 
+      !is.na(BestBenchKg), 
+      !is.na(BestSquatKg), 
+      !is.na(BestDeadliftKg), 
+      !is.na(TotalKg)
+      )
+    data_tested <- filter(
+      testedData, 
+      Sex %in% gender_input(),
+      Equipment %in% equipment_input(), 
+      BodyweightKg <= bodyweight_input_max(), 
+      BodyweightKg >= bodyweight_input_min(), 
+      !is.na(BestBenchKg), 
+      !is.na(BestSquatKg), 
+      !is.na(BestDeadliftKg), 
+      !is.na(TotalKg)
+      )
     
     # checks if there are data points in selected bodyweight range, if not shows error message.
     validate(
@@ -460,28 +479,109 @@ server <- function(input, output) {
   })
   
   output$parcoord <- renderPlotly({
+    #untested data
+    ud <- filter(
+      untestedData,
+      Equipment %in% equipment_input(), 
+      BodyweightKg <= bodyweight_input_max(), 
+      BodyweightKg >= bodyweight_input_min(),
+      !is.na(BestBenchKg), 
+      !is.na(BestSquatKg), 
+      !is.na(BestDeadliftKg), 
+      !is.na(TotalKg)
+     )
+    
+    td <- filter(
+      testedData,
+      Equipment %in% equipment_input(), 
+      BodyweightKg <= bodyweight_input_max(), 
+      BodyweightKg >= bodyweight_input_min(),
+      !is.na(BestBenchKg), 
+      !is.na(BestSquatKg), 
+      !is.na(BestDeadliftKg), 
+      !is.na(TotalKg)
+    )
+    
     #untested male
-    um <- filter(untestedData, Sex == "M", Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(),!is.na(BestBenchKg), !is.na(BestSquatKg), !is.na(BestDeadliftKg), !is.na(TotalKg), Place == 1)
+    um <- filter(
+      ud, 
+      Sex == "M" 
+      )
+    
     #tested male
-    tm <- filter(testedData, Sex == "M", Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(),!is.na(BestBenchKg), !is.na(BestSquatKg), !is.na(BestDeadliftKg), !is.na(TotalKg), Place == 1)
+    tm <- filter(
+      td, 
+      Sex == "M"
+      )
+    
     #untested female
-    uf <- filter(untestedData, Sex == "F", Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(),!is.na(BestBenchKg), !is.na(BestSquatKg), !is.na(BestDeadliftKg), !is.na(TotalKg), Place == 1)
+    uf <- filter(
+      ud, 
+      Sex == "F"
+      )
+    
     #tested female
-    tf <- filter(testedData, Sex == "F", Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(),!is.na(BestBenchKg), !is.na(BestSquatKg), !is.na(BestDeadliftKg), !is.na(TotalKg), Place == 1)
+    tf <- filter(
+      td, 
+      Sex == "F"
+      )
 
     #averages for each lift category
-    squat <- c(mean(um[!is.na(um[,'BestSquatKg']),'BestSquatKg']), mean(tm[!is.na(tm[,'BestSquatKg']),'BestSquatKg']), mean(uf[!is.na(uf[,'BestSquatKg']),'BestSquatKg']),mean(tf[!is.na(tf[,'BestSquatKg']),'BestSquatKg']))
-    bench <- c(mean(um[!is.na(um[,'BestBenchKg']),'BestBenchKg']), mean(tm[!is.na(tm[,'BestBenchKg']),'BestBenchKg']), mean(uf[!is.na(uf[,'BestBenchKg']),'BestBenchKg']),mean(tf[!is.na(tf[,'BestBenchKg']),'BestBenchKg']))
-    deadlift <- c(mean(um[!is.na(um[,'BestDeadliftKg']),'BestDeadliftKg']), mean(tm[!is.na(tm[,'BestDeadliftKg']),'BestDeadliftKg']), mean(uf[!is.na(uf[,'BestDeadliftKg']),'BestDeadliftKg']),mean(tf[!is.na(tf[,'BestDeadliftKg']),'BestDeadliftKg']))
-    total <- c(mean(um[!is.na(um[,'TotalKg']),'TotalKg']), mean(tm[!is.na(tm[,'TotalKg']),'TotalKg']), mean(uf[!is.na(uf[,'TotalKg']),'TotalKg']),mean(tf[!is.na(tf[,'TotalKg']),'TotalKg']))
-    wilks <- c(mean(um[!is.na(um[,'Wilks']),'Wilks']), mean(tm[!is.na(tm[,'Wilks']),'Wilks']), mean(uf[!is.na(uf[,'Wilks']),'Wilks']),mean(tf[!is.na(tf[,'Wilks']),'Wilks']))
-    groups <- c("Untested Male","Tested Male", "Untested Female", "Tested Female")
-    data_all <- data.frame(Squat = squat,Bench = bench, Deadlift = deadlift,Total = total, Wilks = wilks, Group = groups)
-    labs <- data_all[6]
+
+    s1 <- "BestSquatKg"
+    s2 <- "BestBenchKg"
+    s3 <- "BestDeadliftKg"
+    s4 <- "TotalKg"
+    s5 <- "Wilks"
+    titles <- c(s1,s2,s3,s4,s5)
+      
+    squat <- c(
+      mean(um[,s1]), 
+      mean(tm[,s1]), 
+      mean(uf[,s1]),
+      mean(tf[,s1])
+      )
+    bench <- c(
+      mean(um[,s2]), 
+      mean(tm[,s2]), 
+      mean(uf[,s2]),
+      mean(tf[,s2])
+      )
+    deadlift <- c(
+      mean(um[,s3]),
+      mean(tm[,s3]), 
+      mean(uf[,s3]),
+      mean(tf[,s3])
+      )
     
-    ggparcoord(data_all, columns = 1:(ncol(data_all)-1), groupColumn = ncol(data_all), scale = "globalminmax", alphaLines = 0.6) + 
-      geom_line(size = 0.25)  +
-      ggtitle("Var relationships across clusters") + 
+    total <- c(
+      mean(um[,s4]), 
+      mean(tm[,s4]), 
+      mean(uf[,s4]),
+      mean(tf[,s4])
+      )
+    
+    wilks <- c(
+      mean(um[,s5]), 
+      mean(tm[,s5]), 
+      mean(uf[,s5]),
+      mean(tf[,s5])
+      )
+    
+    groups <- c(
+      "Untested Male",
+      "Tested Male", 
+      "Untested Female", 
+      "Tested Female"
+      )
+    
+    data_all <- data.frame(Squat = squat,Bench = bench, Deadlift = deadlift,Total = total, Wilks = wilks, Groups = groups)
+
+    
+    #create the parallel coordinate plot
+    ggparcoord(data_all, columns = 1:(ncol(data_all)-1), groupColumn = ncol(data_all), scale = "globalminmax", alphaLines = 1) + 
+      geom_line(size = 0.5)  +
+      ggtitle("Powerlifting performance of First Placers") + 
       xlab("Dimensions") + ylab("Kilos") +
       scale_colour_manual(values = c("Untested Male" = "#5268ea", 
                                      "Tested Male" = "#60beea", 
