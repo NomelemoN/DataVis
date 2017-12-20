@@ -12,6 +12,8 @@ library(countrycode)
 library(htmltools)
 library(htmlwidgets)
 library(leaflet.minicharts)
+library(plotly)
+library(GGally)
 #=================Global Variables==================================================
 
 
@@ -106,7 +108,10 @@ ui <- dashboardPage(skin = "green",
                                 ),
                                 
                                 br(),
-                                
+                                sliderInput("yearRange", "Range of Years",
+                                            min = min(meet_data$Year, na.rm = TRUE), max = max(meet_data$Year, na.rm = TRUE), step = 1,
+                                            value = c(min(meet_data$Year, na.rm = TRUE), max(meet_data$Year, na.rm = TRUE))),
+                                br(),
                                 fluidRow(
                                   box(width = 12, title = "Meet locations averaged across Years",
                                   leafletOutput("vector_map")
@@ -126,8 +131,14 @@ ui <- dashboardPage(skin = "green",
                                             value = c(min(lifter_data$BodyweightKg, na.rm = TRUE), max(lifter_data$BodyweightKg, na.rm = TRUE))),
                                 br(),
                                 fluidRow(
-                                  box(width = 12, title = "Comparision between tested and untested federations",
+                                  box(width = 12, title = "Comparison between tested and untested federations",
                                       plotOutput("drugs_comparison")
+                                  )
+                                ),
+                                br(),
+                                fluidRow(
+                                  box(width = 12, title = "Comparison between tested and untested federations",
+                                      plotlyOutput("parcoord")
                                   )
                                 )
                         ),
@@ -190,6 +201,21 @@ server <- function(input, output) {
     }
   })
   
+  min_year <- reactive({
+    if(!is.null(input$yearRange)){ 
+      input$yearRange[1]
+    }
+    else
+      min(lifter_data$Year, na.rm = TRUE)
+  })
+  
+  max_year <- reactive({
+    if(!is.null(input$yearRange)){ 
+      input$yearRange[2]
+    }
+    else
+      min(lifter_data$Year, na.rm = TRUE)
+  })
   
   ## Return selected lift type to show at plot
   lift_kg_input <- reactive({
@@ -315,7 +341,7 @@ server <- function(input, output) {
   })
   #This is the logic for the vector map shown in Tab 1, showing geographic shift over time
   output$vector_map <- renderLeaflet({
-    dataset <- filter(meet_data, Federation %in% myFeds(), Federation %in% type()) #Filters by Federation and type of meet
+    dataset <- filter(meet_data, Federation %in% myFeds(), Federation %in% type(), Year >= min_year(), Year <= max_year()) #Filters by Federation and type of meet
     if(length(dataset$Year) != 0){
       lats <- vector(mode = "numeric", length = max(dataset$Year) - min(dataset$Year))
       longs <- vector(mode = "numeric", length = max(dataset$Year) - min(dataset$Year))
@@ -331,7 +357,10 @@ server <- function(input, output) {
       
       
       #create a dataframe containing all lat and long values, without NaN values
-      loc.data <- data.frame(obs = c("lat", "long"), lats, longs, years)
+      print(lats)
+      print(longs)
+      print(years)
+      loc.data <- data.frame(lats, longs, years)
       loc.data <- loc.data[is.finite(loc.data$lats),]
       
       #easier way to work with for the addFlows() function
@@ -369,6 +398,7 @@ server <- function(input, output) {
           opacity = 0.5
         ) %>%
         
+        #Add vector between starting year and final year
         addFlows(
           lng0 = loc.data2$longs1[1], lat0 = loc.data2$lats1[1], lng1 = loc.data2$longs2[length(loc.data2$longs2)], lat1 = loc.data2$lats2[length(loc.data2$lats2)],
           popup =  popupArgs(noPopup = TRUE),
@@ -420,7 +450,6 @@ server <- function(input, output) {
     d2 <- distribution(data_tested[[col_index]])
     
     # creates plot 
-    print(max(lifter_data$TotalKg))
     plot(range(0, max(lifter_data$TotalKg[!is.na(lifter_data$TotalKg)])), range(d1$y, d2$y), type = "n", xlab = "Kilogram", ylab = "Density")
     lines(d1, col = "red")
     lines(d2, col = "blue")
@@ -429,7 +458,37 @@ server <- function(input, output) {
     legend("topleft", legend=c("Untested", "Tested"),
            col=c("red", "blue"), lty=1)
   })
+  
+  output$parcoord <- renderPlotly({
+    #untested male
+    um <- filter(untestedData, Sex == "M", Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(),!is.na(BestBenchKg), !is.na(BestSquatKg), !is.na(BestDeadliftKg), !is.na(TotalKg), Place == 1)
+    #tested male
+    tm <- filter(testedData, Sex == "M", Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(),!is.na(BestBenchKg), !is.na(BestSquatKg), !is.na(BestDeadliftKg), !is.na(TotalKg), Place == 1)
+    #untested female
+    uf <- filter(untestedData, Sex == "F", Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(),!is.na(BestBenchKg), !is.na(BestSquatKg), !is.na(BestDeadliftKg), !is.na(TotalKg), Place == 1)
+    #tested female
+    tf <- filter(testedData, Sex == "F", Equipment %in% equipment_input(), BodyweightKg <= bodyweight_input_max(), BodyweightKg >= bodyweight_input_min(),!is.na(BestBenchKg), !is.na(BestSquatKg), !is.na(BestDeadliftKg), !is.na(TotalKg), Place == 1)
 
+    #averages for each lift category
+    squat <- c(mean(um[!is.na(um[,'BestSquatKg']),'BestSquatKg']), mean(tm[!is.na(tm[,'BestSquatKg']),'BestSquatKg']), mean(uf[!is.na(uf[,'BestSquatKg']),'BestSquatKg']),mean(tf[!is.na(tf[,'BestSquatKg']),'BestSquatKg']))
+    bench <- c(mean(um[!is.na(um[,'BestBenchKg']),'BestBenchKg']), mean(tm[!is.na(tm[,'BestBenchKg']),'BestBenchKg']), mean(uf[!is.na(uf[,'BestBenchKg']),'BestBenchKg']),mean(tf[!is.na(tf[,'BestBenchKg']),'BestBenchKg']))
+    deadlift <- c(mean(um[!is.na(um[,'BestDeadliftKg']),'BestDeadliftKg']), mean(tm[!is.na(tm[,'BestDeadliftKg']),'BestDeadliftKg']), mean(uf[!is.na(uf[,'BestDeadliftKg']),'BestDeadliftKg']),mean(tf[!is.na(tf[,'BestDeadliftKg']),'BestDeadliftKg']))
+    total <- c(mean(um[!is.na(um[,'TotalKg']),'TotalKg']), mean(tm[!is.na(tm[,'TotalKg']),'TotalKg']), mean(uf[!is.na(uf[,'TotalKg']),'TotalKg']),mean(tf[!is.na(tf[,'TotalKg']),'TotalKg']))
+    wilks <- c(mean(um[!is.na(um[,'Wilks']),'Wilks']), mean(tm[!is.na(tm[,'Wilks']),'Wilks']), mean(uf[!is.na(uf[,'Wilks']),'Wilks']),mean(tf[!is.na(tf[,'Wilks']),'Wilks']))
+    groups <- c("Untested Male","Tested Male", "Untested Female", "Tested Female")
+    data_all <- data.frame(Squat = squat,Bench = bench, Deadlift = deadlift,Total = total, Wilks = wilks, Group = groups)
+    labs <- data_all[6]
+    
+    ggparcoord(data_all, columns = 1:(ncol(data_all)-1), groupColumn = ncol(data_all), scale = "globalminmax", alphaLines = 0.6) + 
+      geom_line(size = 0.25)  +
+      ggtitle("Var relationships across clusters") + 
+      xlab("Dimensions") + ylab("Kilos") +
+      scale_colour_manual(values = c("Untested Male" = "#5268ea", 
+                                     "Tested Male" = "#60beea", 
+                                     "Untested Female" = "#d33937",
+                                     "Tested Female" = "#eaa86e"))
+    
+  })
 }
 
 #==============Run the application (no change needed here)============================
