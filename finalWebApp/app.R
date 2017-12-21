@@ -1,0 +1,680 @@
+library(shiny)
+library(shinydashboard)
+library(googleVis)
+library(dplyr)
+library(readr)
+library(lattice)
+library(dplyr)
+library(tidyr)
+library(RColorBrewer)
+library(plotly)
+library(tidyverse)
+library(leaflet)
+library(rgdal)
+library(countrycode)
+library(htmltools)
+library(htmlwidgets)
+library(leaflet.minicharts)
+library(GGally)
+
+
+#=================Global Variables==================================================
+
+# Types of federations
+testedFeds <- c('AAU','AsianPF','CommonwealthPF','CPU','EPF','FESUPO','FFForce','GBPF',
+                'IPF','IrishPF','NAPF','NASA','NIPF','NSF','NZPF','OceaniaPF','PA','RAW',
+                'THSPA','USAPL','WNPF')
+# Meet Data
+meet_data = read_csv("meets.csv")
+meet_data$MeetCountry = gsub('England','United Kingdom',meet_data$MeetCountry)
+meet_data$MeetCountry = gsub('N.Ireland','United Kingdom',meet_data$MeetCountry)
+
+# Powerlifting data
+lifts_data = read_csv("openpowerlifting.csv") %>%
+  select(MeetID, Name, Sex, Equipment, Division, BodyweightKg, WeightClassKg,
+         BestSquatKg, BestBenchKg, BestDeadliftKg, TotalKg, Wilks, Place)
+
+# Data cleaning
+lifts_data <- lifts_data[complete.cases(lifts_data),]
+
+lifts_data$Place = as.integer(lifts_data$Place)
+lifts_data$WeightClassKg <- as.factor(lifts_data$WeightClassKg)
+
+popular_weight_classes = lifts_data %>% group_by(WeightClassKg) %>% summarise(n = n()) %>%
+  filter(n>1000)
+
+lifts_data = filter(lifts_data, BestSquatKg > 0 & BestBenchKg > 0 & 
+                      BestDeadliftKg > 0 & Place > 0 & Place < 6 &
+                      WeightClassKg %in% popular_weight_classes$WeightClassKg) %>%
+  distinct(MeetID, Name, Sex, Equipment, Division, BodyweightKg, WeightClassKg,
+           BestSquatKg, BestBenchKg, BestDeadliftKg, TotalKg, Wilks, Place) %>%
+  inner_join(select(meet_data, MeetID, Year, Federation)) %>%
+  mutate(fed_type = ifelse(Federation %in% testedFeds, "Tested", "Untested"), 
+         cons_val = 1, color_var = 1, size_var = 1)
+
+lifts_data$Year <- as.factor(lifts_data$Year)
+lifts_data$Federation <- as.factor(lifts_data$Federation)
+lifts_data$fed_type <- as.factor(lifts_data$fed_type)
+
+# Fed and category lists
+weight_categories <- as.vector(popular_weight_classes$WeightClassKg)
+allFeds <- sort(as.vector(unique(lifts_data$Federation)))
+untestedFeds <- setdiff(allFeds, testedFeds)
+genders = unique(lifts_data$Sex)
+equipments = unique(lifts_data$Equipment)
+
+
+
+#Load polygons for world map
+world_spdf=readOGR( dsn= "TM_WORLD_BORDERS_SIMPL-0.3" , layer="TM_WORLD_BORDERS_SIMPL-0.3")
+
+#Saint martin was not found in the country code package, and as no meets were held there, we changed its name to a different country
+world_spdf@data$NAME = gsub('Saint Martin', 'Malta', world_spdf@data$NAME)
+world_spdf@data$NAME[142] = 'Malta'
+countrycodes = countrycode(world_spdf@data$NAME,'country.name','iso3c') #doesnt recognize all countries
+meetCountries = unique(meet_data$MeetCountry)
+
+#Making sure all coutnry names are equal
+for(row in 1:length(meetCountries)){
+  index = match(countrycode(meetCountries[row],'country.name','iso3c'),countrycodes)
+  world_spdf@data$NAME[index] = meetCountries[row]
+}
+
+#=================UI Design========================================================
+ui <- dashboardPage(skin = "green",
+                    
+                    dashboardHeader(title = 'Powerlifting Info Portal', titleWidth = 250),
+                    
+                    dashboardSidebar(width = 250,
+                                     sidebarMenu(
+                                       menuItem("Growing Popularity", tabName = "popularity", icon = icon("globe")),
+                                       menuItem("Effect of Drugs", tabName = "drugs", icon = icon("rocket")),
+                                       menuItem("Top scorers", tabName = "strategy", icon = icon("balance-scale")),
+                                       menuItem("About Us", tabName = "profile", icon = icon("address-card-o"))
+                                     )
+                    ),
+                    
+                    dashboardBody(
+                      tabItems(
+                        tabItem(tabName = "popularity",
+                                
+                                h2("Powerlifting is gaining popularity worldwide"), 
+                                
+                                # pop_year, pop_feds, pop_fed_type, pop_countries, pop_yearRange
+                                
+                                br(), 
+                                fluidRow(
+                                  box(width = 9, height = 720,
+                                         mainPanel(
+                                           tabsetPanel(
+                                             tabPanel("Map", 
+                                                      leafletOutput("intensity_map")
+                                             ),
+                                             tabPanel("Globe", 
+                                                      plotlyOutput("intensity_globe")
+                                             )
+                                           )
+                                         )
+                                  ),
+                                  box(width = 3, height = 720, title = "Data Filters",
+                                         sliderInput("pop_year", "Year", ##Create a input element
+                                                     min = min(meet_data$Year), max = max(meet_data$Year), step = 1,
+                                                     value = max(meet_data$Year), 
+                                                     animate = animationOptions(interval = 3000, loop = FALSE)),
+                                         checkboxGroupInput("pop_feds", "Choose Federations:", allFeds, inline = TRUE),
+                                         checkboxGroupInput('pop_fed_type','Types:', c('Tested', 'Untested'), inline = TRUE),
+                                         selectInput("pop_countries", "Country", 
+                                                     choices = union("All", meetCountries), 
+                                                     label = "Countries",multiple = FALSE)
+                                  )
+                                ),
+                                br(),
+                                h2("Powerlifting is moving out of Scandinavia"),
+                                fluidRow(
+                                  box(width = 9, height = 720,
+                                         mainPanel(
+                                           tabsetPanel(
+                                             tabPanel("Map", 
+                                                      leafletOutput("vector_map")
+                                             ),
+                                             tabPanel("Globe", 
+                                                      plotlyOutput("vector_globe")
+                                             )
+                                           )
+                                         )
+                                  ),
+                                  box(width = 3, height = 720,
+                                         sliderInput("pop_yearRange", "Range of Years",
+                                                     min = min(meet_data$Year, na.rm = TRUE), 
+                                                     max = max(meet_data$Year, na.rm = TRUE), step = 1,
+                                                     value = c(min(meet_data$Year, na.rm = TRUE), 
+                                                               max(meet_data$Year, na.rm = TRUE)))
+                                  )
+                                )
+                        ),
+                        tabItem(tabName = "drugs",
+                                h2("Tested vs Untested"), 
+                                checkboxGroupInput('drug_equipment','Equipment:', equipments, inline = TRUE),
+                                br(),
+                                sliderInput("drug_bodyweight", "Bodyweight Range:",
+                                            min = min(lifts_data$BodyweightKg), 
+                                            max = max(lifts_data$BodyweightKg), step = 1,
+                                            value = c(min(lifts_data$BodyweightKg), 
+                                                      max(lifts_data$BodyweightKg))),
+                                br(),
+                                fluidRow(
+                                  box(width = 12, height = 600, plotlyOutput("parcoord"))
+                                )
+                        ),
+                        tabItem(tabName = "strategy",
+                                
+                                fluidRow(
+                                  column(width = 9,
+                                         tags$head(
+                                           tags$style(HTML("
+                                            #final_text {
+                                              text-align: center;
+                                            }
+                                            div.box-header {
+                                              text-align: center;
+                                            }
+                                            ")
+                                           )
+                                         ),
+                                         
+                                         box(width = 12, height = 720,status = "primary", 
+                                             title = "Powerlifting scores for top rankers",
+                                             plotlyOutput("scatter_3d")
+                                         )
+                                  ),
+                                  column(width = 3,
+                                         box(width = 12, title = "Data filters",status = "info",
+                                             
+                                             
+                                             selectInput("top_category", "Weight class:", weight_categories),
+                                             selectInput("top_sex", "Sex:", c("All", genders)),
+                                             selectInput("top_equipment", "Equipment:", c("All", equipments)),
+                                             selectInput("top_federation", "Federation:", c("All", "Tested", "Untested", allFeds))
+                                         ),
+                                         br(),
+                                         #MeetID, Name, Sex, Equipment, Division, BodyweightKg, WeightClassKg,
+                                         #BestSquatKg, BestBenchKg, BestDeadliftKg, TotalKg,  Wilks, Place, 
+                                         #Year, Federation, fed_type, cons_val, color_var, size_var
+                                         box(width = 12, title = "Plot controls",status = "info",
+                                             selectInput("col_var", "Bubble color variable:", c("Sex"=3,
+                                                                                                "Equipment"=4,
+                                                                                                "Federation"=15,
+                                                                                                "Federation type"=16,
+                                                                                                "Year"=14,
+                                                                                                "Total kg"=11,
+                                                                                                "Wilks"=12
+                                             )),
+                                             selectInput("size_var", "Bubble size variable:", c("None"=17,
+                                                                                                "Total kg"=11,
+                                                                                                "Wilks"=12,
+                                                                                                "Bodyweight"=6))
+                                         )
+                                  )
+                                )
+                                
+                        ),
+                        tabItem(tabName = "profile",
+                                p("This app has been developed for Data Visualization course at TU Delft.")
+                        )
+                      )
+                    )
+)
+
+#==============Logic for interactive stuff goes into server function==================
+
+server <- function(input, output) {
+  
+  output$scatter_3d <- renderPlotly({
+    
+    sq_data = filter(lifts_data, WeightClassKg == input$top_category)
+    if (input$top_sex!="All")
+      sq_data = filter(lifts_data, Sex == isolate(input$top_sex))
+    if (input$top_equipment!="All")
+      sq_data = filter(lifts_data, Equipment == isolate(input$top_equipment))
+    if (input$top_federation=="Tested")
+      sq_data = filter(lifts_data, fed_type == "Tested")
+    if (input$top_federation=="Untested")
+      sq_data = filter(lifts_data, fed_type == "Unested")
+    if (input$top_federation!="All"&&input$top_federation!="Tested"&&input$top_federation!="Untested")
+      sq_data = filter(lifts_data, Federation == isolate(input$top_federation))
+    sq_data$color_var = sq_data[[3]]
+    sq_data$size_var = sq_data[[14]]
+    if(!is.na(input$col_var) && !is.na(input$size_var)) {
+      sq_data$color_var = sq_data[[as.integer(isolate(input$col_var))]]
+      sq_data$size_var = sq_data[[as.integer(isolate(input$size_var))]]
+    }
+    
+    colors <- c('#4AC6B7', '#1972A4', '#965F8A', '#FF7070', '#C61951')
+    p <- plot_ly(sq_data, x = ~BestSquatKg, y = ~BestBenchKg, z = ~BestDeadliftKg, 
+                 color = ~color_var,  colors = colors, size = ~size_var,
+                 marker = list(symbol = 'circle', sizemode = 'diameter'), sizes = c(1, 5),
+                 text = ~paste('Total (Kg):', TotalKg,'<br>Name:', Name, #'<br>Sex:', Sex, 
+                               '<br>Bodyweight (kg):', BodyweightKg, '<br>Wilks:', Wilks,
+                               #'<br>Equipment:', Equipment,
+                               '<br>Meet Id:', MeetID,
+                               '<br>Place:', Place)) %>%
+      layout(#title = 'Powerlifting scores',
+        width = 1000,
+        height = 650,
+        scene = list(xaxis = list(title = 'Squat',
+                                  #gridcolor = 'rgb(255, 255, 255)',
+                                  #range = c(2.003297660701705, 5.191505530708712),
+                                  #type = 'log',
+                                  zerolinewidth = 1,
+                                  ticklen = 5,
+                                  gridwidth = 2),
+                     yaxis = list(title = 'Benchpress',
+                                  zerolinewidth = 1,
+                                  ticklen = 5,
+                                  gridwith = 2),
+                     zaxis = list(title = 'Deadlift',
+                                  zerolinewidth = 1,
+                                  ticklen = 5,
+                                  gridwith = 2)),
+        paper_bgcolor = 'rgb(255, 255, 255)',
+        plot_bgcolor = 'rgb(243, 243, 243)'
+      )
+    p
+  })
+  
+  
+  ## pop_year, pop_feds, pop_fed_type, pop_countries, pop_yearRange
+  myYear <- reactive({
+    if(!is.null(input$pop_year))
+      input$pop_year
+    else
+      2017
+  })
+  
+  ## Return selected federations in Tab 1
+  myFeds <- reactive({
+    if(!is.null(input$pop_feds))
+      input$pop_feds
+    else
+      allFeds
+  })
+  
+  ## Return selected countries in Tab 1
+  myCountry <- reactive({
+    if(!is.null(input$pop_countries) && !(input$pop_countries == "All")){
+      input$pop_countries
+    }
+    else
+      meetCountries
+  })
+  
+  ## Return all feds of selected type in Tab 1
+  type <-reactive({
+    if(!is.null(input$pop_fed_type)){
+      if("Tested" %in% input$pop_fed_type && "Untested" %in% input$pop_fed_type){
+        allFeds
+      }else if("Tested" %in% input$pop_fed_type){
+        testedFeds
+      }else if("Untested" %in% input$pop_fed_type){
+        untestedFeds
+      }
+    }else{
+      allFeds
+    }
+  })
+  
+  #Year range used in Tab 1
+  min_year <- reactive({
+    if(!is.null(input$pop_yearRange)){ 
+      input$pop_yearRange[1]
+    }
+    else
+      min(meet_data$Year, na.rm = TRUE)
+  })
+  
+  max_year <- reactive({
+    if(!is.null(input$pop_yearRange)){ 
+      input$pop_yearRange[2]
+    }
+    else
+      min(meet_data$Year, na.rm = TRUE)
+  })
+  
+  
+  #This is the logic for the intensity_map shown in tab 1, Powerlifting across the world
+  output$intensity_map <- renderLeaflet({
+    
+    #Filters meets for the selected year, federations, and type
+    dataset <- filter(
+      meet_data, 
+      Year==myYear(), 
+      Federation %in% myFeds(), 
+      Federation %in% type(), 
+      MeetCountry %in% myCountry()) %>%
+      #Counts the number of meet for each country
+      count(MeetCountry) 
+    
+    #same as above, but without counting the number of countries
+    meets <- filter(
+      meet_data, 
+      Year==myYear(), 
+      Federation %in% myFeds(), 
+      Federation %in% type(), 
+      MeetCountry %in% myCountry())
+    
+    #We add a new data column to the world map data which holds the number of meets in a country
+    world_spdf@data$n = 0
+    if(nrow(dataset) != 0){
+      for(row in 1:nrow(dataset)){
+        #If country names are the same between the meet dataset and the world map, add meetnumber to the country column in the same index 
+        index = match(dataset[[row, "MeetCountry"]], world_spdf@data$NAME)
+        world_spdf@data$n[index] = dataset[[row, "n"]]
+      }
+    }
+    
+    #colors
+    mybins=c(0,1,10,100,200,400,800,1600) #set up color bins
+    mypalette = colorBin( palette="Oranges", domain=world_spdf@data$n, bins=mybins) #choose color palette to base on
+    
+    #country title
+    mytext=paste("<b>Country: </b>", world_spdf@data$NAME,"<br/>", "<b>Number of Meets: </b>", world_spdf@data$n, sep="") %>%
+      lapply(htmltools::HTML)
+    
+    # Final Map
+    if(length(meets[["MeetName"]]) != 0){ #There are meets
+      
+      leaflet(world_spdf) %>% 
+        #setView(lat = 53.0000, lng = 9.0000, zoom = 3) %>% #europe
+        
+        addTiles(options = tileOptions(noWrap = TRUE))  %>% #dont show the world map repeated
+        addPolygons( #add selectable country polygons
+          fillColor = ~mypalette(n), stroke=TRUE, fillOpacity = 0.7, color="white", weight=0.4, #color the country polygons based on meet nmber
+          highlight = highlightOptions( weight = 5, color = ~colorNumeric("Oranges", n)(n), dashArray = "", fillOpacity = 0.3, bringToFront = TRUE), #highlight options
+          label = mytext, #show the country text
+          labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "2px 7px"), textsize = "13px", direction = "auto") #specify label options
+        ) %>%
+        
+        #add individual meet datapoints
+        addMarkers(
+          data = meets, 
+          ~long, ~lat, 
+          popup = ~as.character(paste("<b> Number of participants: </b>", NumberParticipants, "<b> Date: </b>", Date, "<b> MeetCountry: </b>", MeetCountry, "<b> MeetState: </b>", MeetState, "<b> MeetTown: </b>", MeetTown, sep = "<br>")), 
+          label =~as.character(MeetName), 
+          clusterOptions = markerClusterOptions(showCoverageOnHover = FALSE)
+        ) %>%
+        
+        #Add legend for the colors of individual countries
+        addLegend( pal=mypalette, values=~n, opacity=0.9, title = paste("Number of Meets in",myYear(), sep = "<br>"), position = "bottomleft" )
+      
+    }else{ #Draw map without markers if there are none present
+      
+      leaflet(world_spdf) %>% 
+        #setView(lat = 53.0000, lng = 9.0000, zoom = 3) %>% #europe
+        addTiles(options = tileOptions(noWrap = TRUE))  %>% 
+        addPolygons( 
+          fillColor = ~mypalette(n), stroke=TRUE, fillOpacity = 0.7, color="white", weight=0.4,
+          highlight = highlightOptions( weight = 5, color = ~colorNumeric("Oranges", n)(n), dashArray = "", fillOpacity = 0.3, bringToFront = TRUE),
+          label = mytext,
+          labelOptions = labelOptions( style = list("font-weight" = "normal", padding = "2px 7px"), textsize = "13px", direction = "auto")
+        ) %>%
+        addLegend( pal=mypalette, values=~n, opacity=0.9, title = paste("Number of Meets in",myYear(), sep = "<br>"), position = "bottomleft" )
+      
+    }
+    
+  })
+  
+  
+  
+  
+  
+  output$intensity_globe <- renderPlotly({
+    data <- filter(meet_data, 
+    Year==myYear(), 
+    Federation %in% myFeds(), 
+    Federation %in% type(), 
+    MeetCountry %in% myCountry()) %>%
+      count(MeetCountry)
+    data <- mutate(data, Code = countrycode(MeetCountry, 'country.name', 'iso3c'))
+    
+    g <- list(
+      showland = TRUE,
+      showlakes = TRUE,
+      showcountries = TRUE,
+      showocean = TRUE,
+      countrywidth = 0.5,
+      landcolor = toRGB("grey90"),
+      lakecolor = toRGB("white"),
+      oceancolor = toRGB("white"),
+      projection = list(
+        type = 'orthographic',
+        rotation = list(
+          lon = -100,
+          lat = 40,
+          roll = 0
+        )
+      ),
+      lonaxis = list(
+        showgrid = TRUE,
+        gridcolor = toRGB("gray40"),
+        gridwidth = 0.5
+      ),
+      lataxis = list(
+        showgrid = TRUE,
+        gridcolor = toRGB("gray40"),
+        gridwidth = 0.5
+      )
+    )
+    
+    p <- plot_geo(data) %>%
+      add_trace(
+        z = ~n, 
+        color = ~n, colors = 'Greens',
+        text = ~MeetCountry, 
+        locations = ~Code #, marker = list(line = l)
+      ) %>%
+      colorbar(title = 'Number of meets', tickprefix = '') %>%
+      layout(
+        width = 1000,
+        height = 650,
+        #title = 'Powerlifting meets',
+        geo = g
+      )
+    p
+  })
+  
+  output$vector_globe <- renderPlotly({
+    data <- filter(meet_data, 
+                   Year==myYear(), 
+                   Federation %in% myFeds(), 
+                   Federation %in% type(), 
+                   MeetCountry %in% myCountry()) %>%
+      count(MeetCountry)
+    data <- mutate(data, Code = countrycode(MeetCountry, 'country.name', 'iso3c'))
+    
+    g <- list(
+      showland = TRUE,
+      showlakes = TRUE,
+      showcountries = TRUE,
+      showocean = TRUE,
+      countrywidth = 0.5,
+      landcolor = toRGB("grey90"),
+      lakecolor = toRGB("white"),
+      oceancolor = toRGB("white"),
+      projection = list(
+        type = 'orthographic',
+        rotation = list(
+          lon = -100,
+          lat = 40,
+          roll = 0
+        )
+      ),
+      lonaxis = list(
+        showgrid = TRUE,
+        gridcolor = toRGB("gray40"),
+        gridwidth = 0.5
+      ),
+      lataxis = list(
+        showgrid = TRUE,
+        gridcolor = toRGB("gray40"),
+        gridwidth = 0.5
+      )
+    )
+    
+    p <- plot_geo(data) %>%
+      add_trace(
+        z = ~n, 
+        color = ~n, colors = 'Greens',
+        text = ~MeetCountry, 
+        locations = ~Code #, marker = list(line = l)
+      ) %>%
+      colorbar(title = 'Number of meets', tickprefix = '') %>%
+      layout(
+        width = 1000,
+        height = 650,
+        #title = 'Powerlifting meets',
+        geo = g
+      )
+    p
+  })
+  
+  # returns selected equipments in Tab 2
+  equipment_input <- reactive({
+    if(!is.null(input$drug_equipment))
+      input$drug_equipment
+    else
+      equipments
+  })
+  
+  # returns selected min bodyweight for range in Tab 2
+  bodyweight_input_min <- reactive({
+    if(!is.null(input$drug_bodyweight)){ 
+      input$drug_bodyweight[1]
+    }
+    else
+      min(lifts_data$BodyweightKg)
+  })
+  
+  # returns selected max bodyweight for range in Tab 2
+  bodyweight_input_max <- reactive({
+    if(!is.null(input$drug_bodyweight)){
+      input$drug_bodyweight[2]
+    }
+    else
+      max(lifts_data$BodyweightKg)
+  })
+  
+  #This is the logic for the parallel coordinate plot in Tab 2  
+  output$parcoord <- renderPlotly({
+    #untested data
+    ud <- filter(
+      lifts_data,
+      fed_type == "Untested",
+      Equipment %in% equipment_input(), 
+      BodyweightKg <= bodyweight_input_max(), 
+      BodyweightKg >= bodyweight_input_min()
+    )
+    
+    td <- filter(
+      lifts_data,
+      fed_type == "Tested",
+      Equipment %in% equipment_input(), 
+      BodyweightKg <= bodyweight_input_max(), 
+      BodyweightKg >= bodyweight_input_min()
+    )
+    
+    #untested male
+    um <- filter(
+      ud, 
+      Sex == "M" 
+    )
+    
+    #tested male
+    tm <- filter(
+      td, 
+      Sex == "M"
+    )
+    
+    #untested female
+    uf <- filter(
+      ud, 
+      Sex == "F"
+    )
+    
+    #tested female
+    tf <- filter(
+      td, 
+      Sex == "F"
+    )
+    
+    #averages for  category
+    
+    s1 <- "BestSquatKg"
+    s2 <- "BestBenchKg"
+    s3 <- "BestDeadliftKg"
+    s4 <- "TotalKg"
+    s5 <- "Wilks"
+    titles <- c(s1,s2,s3,s4,s5)
+    
+    squat <- c(
+      lapply(um[,s1], mean)[[1]], 
+      lapply(tm[,s1], mean)[[1]],
+      lapply(uf[,s1], mean)[[1]],
+      lapply(tf[,s1], mean)[[1]]
+    )
+    bench <- c(
+      lapply(um[,s1], mean)[[1]], 
+      lapply(tm[,s2], mean)[[1]],
+      lapply(uf[,s2], mean)[[1]],
+      lapply(tf[,s2], mean)[[1]]
+    )
+    deadlift <- c(
+      lapply(um[,s3], mean)[[1]], 
+      lapply(tm[,s3], mean)[[1]],
+      lapply(uf[,s3], mean)[[1]],
+      lapply(tf[,s3], mean)[[1]]
+    )
+    
+    total <- c(
+      lapply(um[,s4], mean)[[1]], 
+      lapply(tm[,s4], mean)[[1]],
+      lapply(uf[,s4], mean)[[1]],
+      lapply(tf[,s4], mean)[[1]]
+    )
+    
+    wilks <- c(
+      lapply(um[,s5], mean)[[1]], 
+      lapply(tm[,s5], mean)[[1]],
+      lapply(uf[,s5], mean)[[1]],
+      lapply(tf[,s5], mean)[[1]]
+    )
+    
+    groups <- c(
+      "Untested Male",
+      "Tested Male", 
+      "Untested Female", 
+      "Tested Female"
+    )
+    
+    data_all <- data.frame(Squat = squat,Bench = bench, Deadlift = deadlift,
+                           Total = total, Wilks = wilks, Groups = groups)
+    
+    
+    #create the parallel coordinate plot
+    ggparcoord(data_all, columns = 1:(ncol(data_all)-1), groupColumn = ncol(data_all),
+               scale = "globalminmax", alphaLines = 1) + 
+      geom_line(size = 0.5)  +
+      ggtitle("Powerlifting performance between groups") + 
+      xlab("Dimensions") + ylab("Kilos") + 
+      scale_colour_manual(values = c("Untested Male" = "#5268ea", 
+                                     "Tested Male" = "#60beea", 
+                                     "Untested Female" = "#d33937",
+                                     "Tested Female" = "#eaa86e"))
+    
+  })
+  
+}
+
+#==============Run the application (no change needed here)============================
+
+shinyApp(ui = ui, server = server)
+
