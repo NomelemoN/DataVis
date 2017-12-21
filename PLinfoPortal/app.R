@@ -355,9 +355,47 @@ server <- function(input, output) {
       
       #Compute the average location of powerlifting meets per year
       for(year in years){
+        totalx = 0;
+        totaly = 0;
+        totalz = 0;
         yearDataset <- filter(dataset, Year == year)
-        lats[year + 1 - min(dataset$Year)] = mean(yearDataset[["lat"]])
-        longs[year + 1 - min(dataset$Year)] = mean(yearDataset[["long"]])
+        l = nrow(yearDataset)
+        for(row in 1:nrow(yearDataset)){
+          oldLat <- yearDataset[row, "lat"]
+          oldLong <- yearDataset[row, "long"]
+          #convert to radians
+          oldLat <- oldLat*pi/180
+          oldLong <- oldLong*pi/180
+          #compute cartesian coordinates for each lat long pair
+          totalx = totalx + cos(oldLat)*cos(oldLong)
+          totaly = totaly + cos(oldLat)*sin(oldLong)
+          totalz = totalz + sin(oldLat)
+        }
+        
+        totWeight = l
+        if(l == 0){
+          lats[year + 1 - min(dataset$Year)] = NA
+          longs[year + 1 - min(dataset$Year)] = NA
+        }else{
+          #compute weighted average cartesian coordinates
+          avgx <- totalx/totWeight
+          avgy <- totaly/totWeight
+          avgz <- totalz/totWeight
+          print(avgx)
+          print(avgy)
+          print(avgz)
+          #convert back to longitude and latitude
+          newLong <- atan2(avgy,avgx)
+          hyp <- sqrt(avgx*avgx+avgy*avgy)
+          newLat <- atan2(avgz,hyp)
+          
+          #convert back to degrees
+          newLat <- newLat*180/pi
+          newLong <- newLong*180/pi
+          
+          lats[year + 1 - min(dataset$Year)] = newLat
+          longs[year + 1 - min(dataset$Year)] = newLong
+        }
       }
       
       
