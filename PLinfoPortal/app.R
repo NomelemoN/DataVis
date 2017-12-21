@@ -51,12 +51,14 @@ equipments = unique(lifter_data$Equipment)
 
 #Load polygons for world map
 world_spdf=readOGR( dsn= "TM_WORLD_BORDERS_SIMPL-0.3" , layer="TM_WORLD_BORDERS_SIMPL-0.3")
+
 #Saint martin was not found in the country code package, and as no meets were held there, we changed its name to a different country
 world_spdf@data$NAME = gsub('Saint Martin', 'Malta', world_spdf@data$NAME)
 world_spdf@data$NAME[142] = 'Malta' 
 countrycodes = countrycode(world_spdf@data$NAME,'country.name','iso3c') #doesnt recognize all countries
 meetCountries = unique(meet_data$MeetCountry)
 
+#Making sure all coutnry names are equal
 for(row in 1:length(meetCountries)){ 
   index = match(countrycode(meetCountries[row],'country.name','iso3c'),countrycodes)
   world_spdf@data$NAME[index] = meetCountries[row]
@@ -128,16 +130,16 @@ ui <- dashboardPage(skin = "green",
                                 fluidRow(
                                   box(width = 12,plotlyOutput("parcoord")
                                   )
-                                ),
-                                br(),
-                                selectInput("lift_kg", c("Total", "Squat", "Bench", "Deadlift"), label = "Lifts", multiple = FALSE),
-                                checkboxGroupInput('gender','Gender', genders, inline = TRUE),
-                                br(),
-                                fluidRow(
-                                  box(width = 12, title = "Comparison between tested and untested federations",
-                                      plotOutput("drugs_comparison")
-                                  )
-                                )
+                                 )#,
+                                # br(),
+                                # selectInput("lift_kg", c("Total", "Squat", "Bench", "Deadlift"), label = "Lifts", multiple = FALSE),
+                                # checkboxGroupInput('gender','Gender', genders, inline = TRUE),
+                                # br(),
+                                # fluidRow(
+                                #   box(width = 12, title = "Comparison between tested and untested federations",
+                                #       plotOutput("drugs_comparison")
+                                #   )
+                                # )
                         ),
                         tabItem(tabName = "strategy",
                                 p("Asdfgh")
@@ -210,7 +212,7 @@ server <- function(input, output) {
       min(meet_data$Year, na.rm = TRUE)
   })
   
-  ## Return selected lift type to show at plot
+  ## Return selected lift type to show at plot in Tab 2
   lift_kg_input <- reactive({
     if(!is.null(input$lift_kg)){
       if("Total" %in% input$lift_kg){
@@ -227,7 +229,7 @@ server <- function(input, output) {
       28
   })
   
-  # returns selected equipments
+  # returns selected equipments in Tab 2
   equipment_input <- reactive({
     if(!is.null(input$equipment))
       input$equipment
@@ -235,7 +237,7 @@ server <- function(input, output) {
       equipments
   })
   
-  # returns selected gender
+  # returns selected gender in Tab 2
   gender_input <- reactive({
     if(!is.null(input$gender))
       input$gender
@@ -243,7 +245,7 @@ server <- function(input, output) {
       genders
   })
   
-  # returns selected min bodyweight for range
+  # returns selected min bodyweight for range in Tab 2
   bodyweight_input_min <- reactive({
     if(!is.null(input$bodyweight)){ 
       input$bodyweight[1]
@@ -252,7 +254,7 @@ server <- function(input, output) {
       min(lifter_data$BodyweightKg, na.rm = TRUE)
   })
   
-  # returns selected max bodyweight for range
+  # returns selected max bodyweight for range in Tab 2
   bodyweight_input_max <- reactive({
     if(!is.null(input$bodyweight)){
       input$bodyweight[2]
@@ -439,53 +441,54 @@ server <- function(input, output) {
       }
   })
   
-  output$drugs_comparison <- renderPlot({
-
-    # filters data as tested vs untested
-    data_untested <- filter(
-      untestedData,
-      Sex %in% gender_input(),
-      Equipment %in% equipment_input(),
-      BodyweightKg <= bodyweight_input_max(),
-      BodyweightKg >= bodyweight_input_min(),
-      !is.na(BestBenchKg),
-      !is.na(BestSquatKg),
-      !is.na(BestDeadliftKg),
-      !is.na(TotalKg)
-      )
-    data_tested <- filter(
-      testedData,
-      Sex %in% gender_input(),
-      Equipment %in% equipment_input(),
-      BodyweightKg <= bodyweight_input_max(),
-      BodyweightKg >= bodyweight_input_min(),
-      !is.na(BestBenchKg),
-      !is.na(BestSquatKg),
-      !is.na(BestDeadliftKg),
-      !is.na(TotalKg)
-      )
-
-    # checks if there are data points in selected bodyweight range, if not shows error message.
-    validate(
-      need(nrow(data_untested )!=0 && nrow(data_tested )!=0, "Please select and appropriate range for bodyweights.")
-    )
-
-    col_index <- lift_kg_input() # which column is used (TotalKg, BestSquatKg, BestBenchKg, BestDeadliftKg)
-
-    # creates distributions
-    d1 <- distribution(data_untested[[col_index]])
-    d2 <- distribution(data_tested[[col_index]])
-
-    # creates plot
-    plot(range(0, max(lifter_data$TotalKg[!is.na(lifter_data$TotalKg)])), range(d1$y, d2$y), type = "n", xlab = "Kilogram", ylab = "Density")
-    lines(d1, col = "red")
-    lines(d2, col = "blue")
-    polygon(d1, col=rgb(1, 0, 0,0.5), border=NA) #fills the area under line
-    polygon(d2, col=rgb(0, 0, 1,0.5), border=NA) #fills the area under line
-    legend("topleft", legend=c("Untested", "Tested"),
-           col=c("red", "blue"), lty=1)
-  })
+  # output$drugs_comparison <- renderPlot({
+  # 
+  #   # filters data as tested vs untested
+  #   data_untested <- filter(
+  #     untestedData,
+  #     Sex %in% gender_input(),
+  #     Equipment %in% equipment_input(),
+  #     BodyweightKg <= bodyweight_input_max(),
+  #     BodyweightKg >= bodyweight_input_min(),
+  #     !is.na(BestBenchKg),
+  #     !is.na(BestSquatKg),
+  #     !is.na(BestDeadliftKg),
+  #     !is.na(TotalKg)
+  #     )
+  #   data_tested <- filter(
+  #     testedData,
+  #     Sex %in% gender_input(),
+  #     Equipment %in% equipment_input(),
+  #     BodyweightKg <= bodyweight_input_max(),
+  #     BodyweightKg >= bodyweight_input_min(),
+  #     !is.na(BestBenchKg),
+  #     !is.na(BestSquatKg),
+  #     !is.na(BestDeadliftKg),
+  #     !is.na(TotalKg)
+  #     )
+  # 
+  #   # checks if there are data points in selected bodyweight range, if not shows error message.
+  #   validate(
+  #     need(nrow(data_untested )!=0 && nrow(data_tested )!=0, "Please select and appropriate range for bodyweights.")
+  #   )
+  # 
+  #   col_index <- lift_kg_input() # which column is used (TotalKg, BestSquatKg, BestBenchKg, BestDeadliftKg)
+  # 
+  #   # creates distributions
+  #   d1 <- distribution(data_untested[[col_index]])
+  #   d2 <- distribution(data_tested[[col_index]])
+  # 
+  #   # creates plot
+  #   plot(range(0, max(lifter_data$TotalKg[!is.na(lifter_data$TotalKg)])), range(d1$y, d2$y), type = "n", xlab = "Kilogram", ylab = "Density")
+  #   lines(d1, col = "red")
+  #   lines(d2, col = "blue")
+  #   polygon(d1, col=rgb(1, 0, 0,0.5), border=NA) #fills the area under line
+  #   polygon(d2, col=rgb(0, 0, 1,0.5), border=NA) #fills the area under line
+  #   legend("topleft", legend=c("Untested", "Tested"),
+  #          col=c("red", "blue"), lty=1)
+  # })
   
+#This is the logic for the parallel coordinate plot in Tab 2  
   output$parcoord <- renderPlotly({
     #untested data
     ud <- filter(
@@ -526,7 +529,7 @@ server <- function(input, output) {
       Sex == "F"
       )
 
-    #averages for each lift category
+    #averages for  category
 
     s1 <- "BestSquatKg"
     s2 <- "BestBenchKg"
