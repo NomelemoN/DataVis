@@ -50,20 +50,9 @@ genders = unique(lifter_data$Sex)
 equipments = unique(lifter_data$Equipment)
 
 #Load polygons for world map
-world_spdf=readOGR( dsn= "TM_WORLD_BORDERS_SIMPL-0.3" , layer="TM_WORLD_BORDERS_SIMPL-0.3")
+world_spdf=readOGR( dsn= "TM_WORLD_BORDERS_SIMPL-0.3" , layer="TM_WORLD_BORDERS_SIMPL-0.4")
 
-#Saint martin was not found in the country code package, and as no meets were held there, we changed its name to a different country
-world_spdf@data$NAME = gsub('Saint Martin', 'Malta', world_spdf@data$NAME)
-world_spdf@data$NAME[142] = 'Malta' 
-countrycodes = countrycode(world_spdf@data$NAME,'country.name','iso3c') #doesnt recognize all countries
 meetCountries = unique(meet_data$MeetCountry)
-
-#Making sure all coutnry names are equal
-for(row in 1:length(meetCountries)){ 
-  index = match(countrycode(meetCountries[row],'country.name','iso3c'),countrycodes)
-  world_spdf@data$NAME[index] = meetCountries[row]
-}
-
 #=================UI Design========================================================
 ui <- dashboardPage(skin = "green",
                     
@@ -355,47 +344,29 @@ server <- function(input, output) {
       
       #Compute the average location of powerlifting meets per year
       for(year in years){
-        totalx = 0;
-        totaly = 0;
-        totalz = 0;
         yearDataset <- filter(dataset, Year == year)
-        l = nrow(yearDataset)
-        for(row in 1:nrow(yearDataset)){
-          oldLat <- yearDataset[row, "lat"]
-          oldLong <- yearDataset[row, "long"]
-          #convert to radians
-          oldLat <- oldLat*pi/180
-          oldLong <- oldLong*pi/180
-          #compute cartesian coordinates for each lat long pair
-          totalx = totalx + cos(oldLat)*cos(oldLong)
-          totaly = totaly + cos(oldLat)*sin(oldLong)
-          totalz = totalz + sin(oldLat)
-        }
         
-        totWeight = l
-        if(l == 0){
-          lats[year + 1 - min(dataset$Year)] = NA
-          longs[year + 1 - min(dataset$Year)] = NA
-        }else{
-          #compute weighted average cartesian coordinates
-          avgx <- totalx/totWeight
-          avgy <- totaly/totWeight
-          avgz <- totalz/totWeight
-          print(avgx)
-          print(avgy)
-          print(avgz)
-          #convert back to longitude and latitude
-          newLong <- atan2(avgy,avgx)
-          hyp <- sqrt(avgx*avgx+avgy*avgy)
-          newLat <- atan2(avgz,hyp)
-          
-          #convert back to degrees
-          newLat <- newLat*180/pi
-          newLong <- newLong*180/pi
-          
-          lats[year + 1 - min(dataset$Year)] = newLat
-          longs[year + 1 - min(dataset$Year)] = newLong
-        }
+        totWeight = length(yearDataset$MeetName)
+        totalx = sum(yearDataset$x)
+        totaly = sum(yearDataset$y)
+        totalz = sum(yearDataset$z)
+        
+        avgx <- totalx/totWeight
+        avgy <- totaly/totWeight
+        avgz <- totalz/totWeight
+        
+        
+        #convert back to longitude and latitude
+        newLong <- atan2(avgy,avgx)
+        hyp <- sqrt(avgx*avgx+avgy*avgy)
+        newLat <- atan2(avgz,hyp)
+        
+        #convert back to degrees
+        newLat <- newLat*180/pi
+        newLong <- newLong*180/pi
+        
+        lats[year + 1 - min(dataset$Year)] = newLat
+        longs[year + 1 - min(dataset$Year)] = newLong
       }
       
       
