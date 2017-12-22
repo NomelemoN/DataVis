@@ -84,9 +84,6 @@ equipments = unique(lifts_data$Equipment)
 #Load polygons for world map
 world_spdf=readOGR( dsn= "TM_WORLD_BORDERS_SIMPL-0.3" , layer="TM_WORLD_BORDERS_SIMPL-0.3")
 
-#Load polygons for world map
-world_spdf=readOGR( dsn= "TM_WORLD_BORDERS_SIMPL-0.3" , layer="TM_WORLD_BORDERS_SIMPL-0.3")
-
 #Saint martin was not found in the country code package, and as no meets were held there, we changed its name to a different country
 world_spdf@data$NAME = gsub('Saint Martin', 'Malta', world_spdf@data$NAME)
 world_spdf@data$NAME[142] = 'Malta' 
@@ -225,15 +222,15 @@ server <- function(input, output) {
     
     sq_data = filter(lifts_data, WeightClassKg == input$top_category)
     if (input$top_sex!="All")
-      sq_data = filter(lifts_data, Sex == isolate(input$top_sex))
+      sq_data = filter(sq_data, Sex == isolate(input$top_sex))
     if (input$top_equipment!="All")
-      sq_data = filter(lifts_data, Equipment == isolate(input$top_equipment))
+      sq_data = filter(sq_data, Equipment == isolate(input$top_equipment))
     if (input$top_federation=="Tested")
-      sq_data = filter(lifts_data, fed_type == "Tested")
+      sq_data = filter(sq_data, fed_type == "Tested")
     if (input$top_federation=="Untested")
-      sq_data = filter(lifts_data, fed_type == "Unested")
+      sq_data = filter(sq_data, fed_type == "Untested")
     if (input$top_federation!="All"&&input$top_federation!="Tested"&&input$top_federation!="Untested")
-      sq_data = filter(lifts_data, Federation == isolate(input$top_federation))
+      sq_data = filter(sq_data, Federation == isolate(input$top_federation))
     sq_data$color_var = sq_data[[3]]
     sq_data$size_var = sq_data[[14]]
     if(!is.na(input$col_var) && !is.na(input$size_var)) {
