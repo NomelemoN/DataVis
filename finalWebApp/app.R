@@ -729,7 +729,7 @@ server <- function(input, output) {
       lapply(tf[,s1], mean)[[1]]
     )
     bench <- c(
-      lapply(um[,s1], mean)[[1]], 
+      lapply(um[,s2], mean)[[1]], 
       lapply(tm[,s2], mean)[[1]],
       lapply(uf[,s2], mean)[[1]],
       lapply(tf[,s2], mean)[[1]]
